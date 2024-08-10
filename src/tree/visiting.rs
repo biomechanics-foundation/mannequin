@@ -1,8 +1,24 @@
 //! Internal implementation of depth-first tree traversal
 //! with a visitor pattern.
 
-use super::visitable::{Accumulable, Visiting};
+use super::visitable::Accumulable;
 use std::marker::PhantomData;
+
+/// Trait for structs (visitors) implementing the
+/// [visitor pattern](https://en.wikipedia.org/wiki/Visitor_pattern)
+pub trait Visiting<'a, T, Parameter, Accumulator>
+where
+    T: 'a,
+    Accumulator: Accumulable,
+{
+    /// Visits the next node a tree. A parameter can be provided
+    /// to the computation of the accumulation for each node *along a path*.
+    ///
+    /// In animation, for instance, we want to compute the pose of a character
+    /// by applying angles to each joint. Hence, to compute the local coordinate systems
+    /// an additional parameter is required.
+    fn next(&mut self, parameter: Option<&Parameter>) -> Option<&Vec<(&T, Accumulator)>>;
+}
 
 /// Visitor for depth-first tree traversal. Used in in [`Visitable::visitor`],
 /// one can create this object manually by defining its behavior with closures.

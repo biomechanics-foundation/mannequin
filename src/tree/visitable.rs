@@ -1,31 +1,16 @@
 //! Interfaces for a depth-first tree traversal
 //! with a visitor pattern.
 
-use super::visiting::Visitor;
+use super::visiting::{Visiting, Visitor};
 
 /// Values that can be accumulated *along a path* during tree traversal.
 /// For instance, the affine transformations in a character animation.
+/// This is a thin-wrapper for linear algebra data types in the case of kinematics.
 pub trait Accumulable: Clone {
     /// Create neutral element
     fn neutral() -> Self;
     /// Accumulate.
     fn accumulate(&self, other: &Self) -> Self;
-}
-
-/// Trait for structs (visitors) implementing the
-/// [visitor pattern](https://en.wikipedia.org/wiki/Visitor_pattern)
-pub trait Visiting<'a, T, Parameter, Accumulator>
-where
-    T: 'a,
-    Accumulator: Accumulable,
-{
-    /// Visits the next node a tree. A parameter can be provided
-    /// to the computation of the accumulation for each node *along a path*.
-    ///
-    /// In animation, for instance, we want to compute the pose of a character
-    /// by applying angles to each joint. Hence, to compute the local coordinate systems
-    /// an additional parameter is required.
-    fn next(&mut self, parameter: Option<&Parameter>) -> Option<&Vec<(&T, Accumulator)>>;
 }
 
 /// Trait for structures that represent nodes of a tree that allows visiting its children depth first.
