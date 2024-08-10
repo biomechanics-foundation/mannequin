@@ -5,7 +5,7 @@ use super::visiting::Visitor;
 
 /// Values that can be accumulated *along a path* during tree traversal.
 /// For instance, the affine transformations in a character animation.
-pub trait Accumulable {
+pub trait Accumulable: Clone {
     /// Create neutral element
     fn neutral() -> Self;
     /// Accumulate.
@@ -52,7 +52,8 @@ where
     /// Arbitrary action when visiting a node along path. It receives a reference to the
     /// "history", the previous nodes and accumulator values that is, in addition to mutable
     /// data that allows interaction with the outside context.
-    fn on_visit(&self, stack: &[(&Self, Self::Accumulator)], payload: &mut Self::Payload);
+    #[allow(unused)]
+    fn on_visit(&self, stack: &[(&Self, Self::Accumulator)], payload: &mut Self::Payload) {}
 
     /// Generates a visitor for the tree with the current element as its root.
     fn visitor(&self, max_depth: usize) -> impl Visiting<Self, Self::Parameter, Self::Accumulator> {
@@ -63,14 +64,28 @@ where
     fn visit<'a>(
         &'a self,
         max_depth: usize,
-        mut zipped: impl Iterator<Item = &'a Self::Parameter>,
+        mut parameters: impl Iterator<Item = &'a Self::Parameter>,
         payload: &mut Self::Payload,
     ) {
         let mut visitor = self.visitor(max_depth);
-        while let Some(stack) = visitor.next(zipped.next()) {
+        while let Some(stack) = visitor.next(parameters.next()) {
             self.on_visit(stack, payload);
         }
     }
+
+    // fn iter<'a>(
+    //     &self,
+    //     mut parameters: impl Iterator<Item = &'a Self::Parameter>,
+    // ) -> TreeIterator<
+    //     'a,
+    //     Self,
+    //     impl Visiting<Self, Self::Parameter, Self::Accumulator>,
+    //     Self::Accumulator,
+    //     Self::Parameter,
+    //     impl Iterator<Item = &'a Self::Parameter>,
+    // > {
+    //     todo!()
+    // }
 }
 
 #[cfg(test)]

@@ -6,7 +6,10 @@
 //!             are uses substantives (i.e., omit a `get_` prefix) much like the standard library.
 //!             Callback methods have a `on_` prefix
 
+pub mod iterator;
+pub mod kinematics;
 pub mod visitor;
 
-pub use visitor::visitable::{Accumulable, Visitable};
+pub use iterator::TreeIteration;
+pub use visitor::visitable::{Accumulable, Visitable, Visiting};
 pub use visitor::visiting::Visitor;
