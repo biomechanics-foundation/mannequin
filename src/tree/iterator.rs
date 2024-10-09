@@ -6,7 +6,7 @@ use crate::{Visitable, Visiting};
 
 /// An iterator that traverses a tree depth-first.
 /// Required for parallel processing.
-pub(crate) struct TreeIterator<'a, V, T, Z>
+pub(crate) struct DepthFirstIterator<'a, V, T, Z>
 where
     V: Visiting<'a, T, T::Parameter, T::Accumulator>,
     T: 'a + Visitable,
@@ -17,7 +17,7 @@ where
     t: PhantomData<T>,
 }
 
-impl<'a, V, T, Z> TreeIterator<'a, V, T, Z>
+impl<'a, V, T, Z> DepthFirstIterator<'a, V, T, Z>
 where
     V: Visiting<'a, T, T::Parameter, T::Accumulator>,
     T: 'a + Visitable,
@@ -34,7 +34,7 @@ where
     }
 }
 
-impl<'a, V, T, Z> Iterator for TreeIterator<'a, V, T, Z>
+impl<'a, V, T, Z> Iterator for DepthFirstIterator<'a, V, T, Z>
 where
     V: Visiting<'a, T, T::Parameter, T::Accumulator>,
     T: Visitable,
@@ -44,13 +44,12 @@ where
     type Item = T::Accumulator;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.visitor.next(self.zipped.next()) {
-            // TODO Do I really want to copy? What would be the lifetime of element?
-            // Copying would be necessary, for parallel computation with rayon!
-            // Instead of copying, it might be possible to hold the accumulates in a vector instead of a stack in the Visitor
-            Some(stack) => Some(stack.last().unwrap().1.clone()),
-            _ => None,
-        }
+        // TODO Do I really want to copy? What would be the lifetime of element?
+        // Copying would be necessary, for parallel computation with rayon!
+        // Instead of copying, it might be possible to hold the accumulates in a vector instead of a stack in the Visitor
+        self.visitor
+            .next(self.zipped.next())
+            .map(|stack| stack.last().unwrap().1.clone())
     }
 }
 
@@ -63,7 +62,7 @@ where
 {
     /// Get a depth-first iterator from the visitor
     /// Another iterator is expected.
-    fn zip(&self, zipped: Z, max_depth: usize) -> TreeIterator<'a, V, Self, Z> {
+    fn iter(&self, zipped: Z, max_depth: usize) -> DepthFirstIterator<'a, V, Self, Z> {
         // TreeIterator::new(self.visitor(max_depth), zipped)
         // TreeIterator::new(
         //     Visitor::new(self, max_depth, |s| s.children(), |s, a, z| s.accumulate(a, z)),
@@ -81,12 +80,13 @@ mod tests {
 
     use crate::{DepthFirstIteration, Visitable, Visiting};
 
+    fn test_iterator() {}
     // example how to use the iterator for a kinematics
-    struct Kinematics<T> {
-        index: usize,
-        points: T,
-        // influence: float, // Type is wrong
-    }
+    // struct Kinematics<T> {
+    //     index: usize,
+    //     points: T,
+    //     // influence: float, // Type is wrong
+    // }
 
     //
     // struct Rigging<S, T> {
@@ -114,5 +114,22 @@ mod tests {
     //     }
     // }
 
-    fn test_kinematics() {}
+    fn test_kinematics() {
+        // Not a test yet, but that is how it should look like
+
+        let joint_angles = [0, 1, 0.2, 0.3];
+
+        // In parallel compute local transformations
+        kinematics
+            .into_par_iter()
+            .zip(joint_angles)
+            .for_each(|((_, current), joint_angle)| current.set_local(joint_angle));
+
+        // hierarchically compute global transformation
+        kinematics.iter().for_each(|(parent, current)| {
+            if let Some(parent) = parent {
+                current.global = parent.global * parent.local;
+            }
+        });
+    }
 }

@@ -38,12 +38,13 @@ where
     /// "history", the previous nodes and accumulator values that is, in addition to mutable
     /// data that allows interaction with the outside context.
     #[allow(unused)]
-    fn on_visit(&self, stack: &[(&Self, Self::Accumulator)], payload: &mut Self::Payload) {}
+    fn on_visit(&self, stack: &[(&Self, Self::Accumulator)], payload: &mut Self::Payload);
 
     /// Generates a visitor for the tree with the current element as its root.
     fn visitor(&self, max_depth: usize) -> impl Visiting<Self, Self::Parameter, Self::Accumulator> {
         Visitor::new(self, max_depth, |s| s.children(), |s, a, z| s.accumulate(a, z))
     }
+
     /// Visits all children and children's children and calls `accumulate` (implicitly) and `on_visit`
     /// on each node.
     fn visit<'a>(
