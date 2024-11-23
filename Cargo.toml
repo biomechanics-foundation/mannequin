@@ -6,9 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-itertools = "0.12.1"
+itertools = "0.13.0"
+ndarray = { version = "0.16.1", optional = true, features = ["approx", "blas", "rayon"] }
 
 [features]
 # Feature to enable the accumulation shortcut
 accumulate = []
-ndarray = []
+ndarray = ["dep:ndarray"]
