@@ -1,5 +1,7 @@
 /*! Implementation of a tree iteration with [arena allocation](https://en.wikipedia.org/wiki/Region-based_memory_management) */
 
+// TODO: split this up into two files and a separate folder
+
 use crate::{Nodelike, Order, TreeIterable};
 
 /// Iterator for a depth-first iteration when the data is not already sorted accordingly
@@ -8,7 +10,7 @@ where
     'a: 'b,
 {
     tree: &'a ArenaTree<T>,
-    stack: Vec<std::slice::Iter<'b, <ArenaTree<T> as TreeIterable<T>>::NodeRef>>,
+    stack: Vec<std::slice::Iter<'b, ArenaNodeRef<T>>>,
     // root: &'b Vec<<ArenaTree<T> as IterableTree>::NodeRef>,
     // root2: Vec<<ArenaTree<T> as IterableTree>::NodeRef>,
     // stack2: Vec<std::slice::Iter<'b, <ArenaTree<T> as IterableTree>::NodeRef>>,
@@ -16,7 +18,7 @@ where
 
 impl<'a, 'b, T> DepthFirstIterator<'a, 'b, T> {
     // TODO did not manage to over write the root nodes :(
-    pub fn new(tree: &'a ArenaTree<T>, root: &'b [<ArenaTree<T> as TreeIterable<T>>::NodeRef]) -> Self {
+    pub fn new(tree: &'a ArenaTree<T>, root: &'b [ArenaNodeRef<T>]) -> Self {
         let mut stack = Vec::with_capacity(tree.max_depth);
         stack.push(root.iter());
         DepthFirstIterator { tree, stack }
@@ -76,6 +78,16 @@ impl<T> Nodelike<T> for ArenaNode<T> {
     fn get(&self) -> &T {
         &self.payload
     }
+
+    type NodeRef = usize;
+
+    fn get_ref(&self) -> Self::NodeRef {
+        todo!()
+    }
+
+    fn children(&self) -> &[Self::NodeRef] {
+        todo!()
+    }
 }
 
 /// Iterable tree that uses arena allocation.
@@ -97,11 +109,14 @@ impl<T> ArenaTree<T> {
     }
 }
 
-impl<T> TreeIterable<T> for ArenaTree<T> {
-    type Node = ArenaNode<T>;
+impl<T> TreeIterable<ArenaNode<T>, T> for ArenaTree<T> {
     type NodeRef = usize;
 
-    fn iter<'a, 'b>(&'a self, traversal: Order, root: &'b [Self::NodeRef]) -> Box<dyn Iterator<Item = &Self::Node> + 'b>
+    fn iter<'a, 'b>(
+        &'a self,
+        traversal: Order,
+        root: &'b [Self::NodeRef],
+    ) -> Box<dyn Iterator<Item = &ArenaNode<T>> + 'b>
     where
         'a: 'b,
     {
@@ -115,3 +130,6 @@ impl<T> TreeIterable<T> for ArenaTree<T> {
         }
     }
 }
+
+/// Shortcut for Using the Noderef which unfortunately got pretty complex.
+type ArenaNodeRef<T> = <ArenaTree<T> as TreeIterable<ArenaNode<T>, T>>::NodeRef;
