@@ -47,7 +47,8 @@ where
     T: Body,
 {
     fn accumulate(self, param: &[T::Parameter], max_depth: usize) -> impl Iterator<Item = <T as Body>::Transformation> {
-        self.zip(param.iter())
+        self.into_iter()
+            .zip(param.iter())
             // .scan(Vec::<T::Transformation>::with_capacity(max_depth), |a, (b, c)| None)
             .scan(Vec::<T::Transformation>::with_capacity(max_depth), acc)
     }
@@ -77,6 +78,7 @@ mod tests {
             .enumerate()
             .for_each(|(idx, el)| println!("Accumulated {el} for node {idx}"));
         }
+        #[cfg(not(feature = "accumulate"))]
         {
             let tree = ArenaTree::<DummyBody>::new(DepthFirst);
             let param = &[1.0, 2.0, 3.0];
@@ -84,6 +86,7 @@ mod tests {
             zip.scan(Vec::<<DummyBody as Body>::Transformation>::with_capacity(42), acc)
                 .collect_vec();
         }
+        #[cfg(feature = "accumulate")]
         {
             let tree = ArenaTree::<DummyBody>::new(DepthFirst);
             let param = &[1.0, 2.0, 3.0];

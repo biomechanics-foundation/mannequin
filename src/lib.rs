@@ -7,13 +7,18 @@
 //!             Callback methods have a `on_` prefix
 
 pub mod arena;
-pub mod body;
 pub mod dummy;
 pub mod iterable_tree;
+pub mod jacobi;
+pub mod rigid;
 
 pub use arena::{ArenaNode, ArenaTree};
-pub use body::{acc, Accumulator, Body};
 pub use iterable_tree::{
     IterableTree, Node, Order,
     Order::{BreadthFirst, DepthFirst, Unordered},
 };
+pub use rigid::{acc, Accumulator, Body};
+
+// Backends
+#[cfg(feature = "ndarray")]
+pub mod ndarray;
