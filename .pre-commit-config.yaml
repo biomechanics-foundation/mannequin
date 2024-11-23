@@ -1,0 +1,27 @@
+repos:
+  # - repo: https://github.com/pre-commit/pre-commit-hooks
+  #   rev: v3.2.0
+  #   hooks:
+  #     - id: trailing-whitespace
+  #       files: '.*\.(py|md|json|yaml)'
+  #     - id: end-of-file-fixer
+  #       files: '.*\.(py|md|json|yaml)'
+  #     - id: check-yaml
+  #     - id: check-added-large-files
+  - repo: local
+    hooks:
+      - id: dprint
+        name: Dprint
+        entry: dprint fmt --allow-no-files
+        # pass_filenames: false
+        language: system
+      - id: rustformat
+        name: Rust format
+        entry: cargo fmt --all
+        pass_filenames: false
+        language: system
+      - id: clippy
+        name: Clippy
+        entry: cargo clippy
+        pass_filenames: false
+        language: system
