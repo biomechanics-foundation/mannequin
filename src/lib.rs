@@ -1,6 +1,6 @@
 //! ## Naming conventions
 //!
-//! * Traits – adjectives that indicate capability and behavior
+//! * Traits – adjectives that indicate capability and behavior (TODO this is currently not always true)
 //! * Structs – substantives that indicate entities implementing a behavior
 //! * Methods – imperative forms with the exception of getters and factories, which
 //!             are uses substantives (i.e., omit a `get_` prefix) much like the standard library.
@@ -14,11 +14,12 @@ pub mod rigid;
 
 pub use arena::{ArenaNode, ArenaTree};
 pub use iterable_tree::{
-    IterableTree, Node, Order,
+    Nodelike, Order,
     Order::{BreadthFirst, DepthFirst, Unordered},
+    TreeIterable,
 };
 pub use mannequin::{Forward, Inverse, Mannequin};
-pub use rigid::{acc, Accumulator, RigidBody};
+pub use rigid::{accumulate, Accumulator, Rigid};
 
 // Backends
 #[cfg(feature = "ndarray")]

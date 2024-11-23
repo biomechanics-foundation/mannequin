@@ -1,4 +1,8 @@
-use crate::RigidBody;
+/*! Dummy implementation of a rigid body used for testing */
+
+// TODO move to the test directory once development is done
+
+use crate::Rigid;
 
 pub struct DummyBody {
     value: f64,
@@ -8,7 +12,7 @@ impl DummyBody {
         DummyBody { value }
     }
 }
-impl RigidBody for DummyBody {
+impl Rigid for DummyBody {
     type Transformation = f64;
 
     type Point = i32;

@@ -4,15 +4,15 @@
  * realistic joints, muscle simulation, or classical inverse kinematics and obstacle avoidance.
  */
 
-use crate::{IterableTree, RigidBody};
+use crate::{Rigid, TreeIterable};
 use std::marker::PhantomData;
 
 /// Trait representing a stateful forward kinematics algoritm. For instance, it can represent a rigid body mannequin
 /// (e.g., a robot) or softbody/skinning for character animation.
 pub trait Forward<IT, RB>
 where
-    IT: IterableTree<RB>,
-    RB: RigidBody<Parameter = Self::Parameter>,
+    IT: TreeIterable<RB>,
+    RB: Rigid<Parameter = Self::Parameter>,
 {
     type Parameter;
     type Array;
@@ -24,8 +24,8 @@ where
 pub trait Inverse<IT, RB, FK>
 where
     // Avoid mixing of backends
-    IT: IterableTree<RB>,
-    RB: RigidBody<Parameter = Self::Parameter>,
+    IT: TreeIterable<RB>,
+    RB: Rigid<Parameter = Self::Parameter>,
     FK: Forward<IT, RB, Parameter = RB::Parameter, Array = Self::Array>,
 {
     type Parameter;
@@ -49,8 +49,8 @@ where
 /// character animation.
 pub struct Mannequin<IT, RB, FK, IK>
 where
-    RB: RigidBody,
-    IT: IterableTree<RB>,
+    RB: Rigid,
+    IT: TreeIterable<RB>,
     FK: Forward<IT, RB, Parameter = RB::Parameter>,
     IK: Inverse<IT, RB, FK, Parameter = RB::Parameter, Array = FK::Array>,
 {
@@ -62,8 +62,8 @@ where
 
 impl<IT, RB, FK, IK> Mannequin<IT, RB, FK, IK>
 where
-    RB: RigidBody,
-    IT: IterableTree<RB>,
+    RB: Rigid,
+    IT: TreeIterable<RB>,
     FK: Forward<IT, RB, Parameter = RB::Parameter>,
     IK: Inverse<IT, RB, FK, Parameter = RB::Parameter, Array = FK::Array>,
 {

@@ -1,11 +1,14 @@
-use crate::{IterableTree, Node, Order};
+/*! Implementation of a tree iteration with [arena allocation](https://en.wikipedia.org/wiki/Region-based_memory_management) */
 
+use crate::{Nodelike, Order, TreeIterable};
+
+/// Iterator for a depth-first iteration when the data is not already sorted accordingly
 pub struct DepthFirstIterator<'a, 'b, T>
 where
     'a: 'b,
 {
     tree: &'a ArenaTree<T>,
-    stack: Vec<std::slice::Iter<'b, <ArenaTree<T> as IterableTree<T>>::NodeRef>>,
+    stack: Vec<std::slice::Iter<'b, <ArenaTree<T> as TreeIterable<T>>::NodeRef>>,
     // root: &'b Vec<<ArenaTree<T> as IterableTree>::NodeRef>,
     // root2: Vec<<ArenaTree<T> as IterableTree>::NodeRef>,
     // stack2: Vec<std::slice::Iter<'b, <ArenaTree<T> as IterableTree>::NodeRef>>,
@@ -13,7 +16,7 @@ where
 
 impl<'a, 'b, T> DepthFirstIterator<'a, 'b, T> {
     // TODO did not manage to over write the root nodes :(
-    pub fn new(tree: &'a ArenaTree<T>, root: &'b [<ArenaTree<T> as IterableTree<T>>::NodeRef]) -> Self {
+    pub fn new(tree: &'a ArenaTree<T>, root: &'b [<ArenaTree<T> as TreeIterable<T>>::NodeRef]) -> Self {
         let mut stack = Vec::with_capacity(tree.max_depth);
         stack.push(root.iter());
         DepthFirstIterator { tree, stack }
@@ -37,6 +40,9 @@ impl<'a, 'b, T> Iterator for DepthFirstIterator<'a, 'b, T> {
         }
     }
 }
+
+/// Iterator for a breadth-first iteration when the data is not already sorted accordingly
+
 struct BreadthFirstIterator<'a, T> {
     tree: &'a ArenaTree<T>,
 }
@@ -54,7 +60,7 @@ impl<'a, T> Iterator for BreadthFirstIterator<'a, T> {
     }
 }
 
-// implement deref for this or add a getter
+/// A node structure to be used in an arena allocated tree. Fields are used to speed up iteration
 pub struct ArenaNode<T> {
     payload: T,
     node_ref: usize,
@@ -62,7 +68,7 @@ pub struct ArenaNode<T> {
     children: Vec<usize>,
 }
 
-impl<T> Node<T> for ArenaNode<T> {
+impl<T> Nodelike<T> for ArenaNode<T> {
     fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }
@@ -72,11 +78,11 @@ impl<T> Node<T> for ArenaNode<T> {
     }
 }
 
-// we can probably have a single implementation for
+/// Iterable tree that uses arena allocation.
 pub struct ArenaTree<T> {
     sorting: Order,
     nodes: Vec<ArenaNode<T>>,
-    roots: Vec<<ArenaTree<T> as IterableTree<T>>::NodeRef>,
+    roots: Vec<usize>,
     max_depth: usize,
 }
 
@@ -91,7 +97,7 @@ impl<T> ArenaTree<T> {
     }
 }
 
-impl<T> IterableTree<T> for ArenaTree<T> {
+impl<T> TreeIterable<T> for ArenaTree<T> {
     type Node = ArenaNode<T>;
     type NodeRef = usize;
 
