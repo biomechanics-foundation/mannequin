@@ -1,4 +1,4 @@
-use crate::Body;
+use crate::RigidBody;
 
 pub struct DummyBody {
     value: f64,
@@ -8,7 +8,7 @@ impl DummyBody {
         DummyBody { value }
     }
 }
-impl Body for DummyBody {
+impl RigidBody for DummyBody {
     type Transformation = f64;
 
     type Point = i32;

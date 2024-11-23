@@ -9,7 +9,7 @@
 pub mod arena;
 pub mod dummy;
 pub mod iterable_tree;
-pub mod jacobi;
+pub mod kinematics;
 pub mod rigid;
 
 pub use arena::{ArenaNode, ArenaTree};
@@ -17,7 +17,7 @@ pub use iterable_tree::{
     IterableTree, Node, Order,
     Order::{BreadthFirst, DepthFirst, Unordered},
 };
-pub use rigid::{acc, Accumulator, Body};
+pub use rigid::{acc, Accumulator, RigidBody};
 
 // Backends
 #[cfg(feature = "ndarray")]

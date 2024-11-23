@@ -1,5 +1,5 @@
 use crate::Node;
-pub trait Body {
+pub trait RigidBody {
     // E.g., 4x4 matrix, (3x1, 3x3), quaternions ...
     type Transformation: Clone;
     // Vec, [f64;4], ...
@@ -20,7 +20,7 @@ pub trait Body {
 pub fn acc<S, T>(stack: &mut Vec<T::Transformation>, arg: (&S, &T::Parameter)) -> Option<T::Transformation>
 where
     S: Node<T>,
-    T: Body,
+    T: RigidBody,
 {
     let (node, param) = arg;
     let current = T::concat(
@@ -36,7 +36,7 @@ where
 
 pub trait Accumulator<T>
 where
-    T: Body,
+    T: RigidBody,
 {
     fn accumulate(self, param: &[T::Parameter], max_depth: usize) -> impl Iterator<Item = T::Transformation>;
 }
@@ -44,9 +44,13 @@ where
 impl<'a, S, T> Accumulator<T> for Box<dyn Iterator<Item = &'a S>>
 where
     S: Node<T>,
-    T: Body,
+    T: RigidBody,
 {
-    fn accumulate(self, param: &[T::Parameter], max_depth: usize) -> impl Iterator<Item = <T as Body>::Transformation> {
+    fn accumulate(
+        self,
+        param: &[T::Parameter],
+        max_depth: usize,
+    ) -> impl Iterator<Item = <T as RigidBody>::Transformation> {
         self.into_iter()
             .zip(param.iter())
             // .scan(Vec::<T::Transformation>::with_capacity(max_depth), |a, (b, c)| None)
@@ -83,7 +87,7 @@ mod tests {
             let tree = ArenaTree::<DummyBody>::new(DepthFirst);
             let param = &[1.0, 2.0, 3.0];
             let zip = tree.iter(DepthFirst, &[]).zip(param.iter());
-            zip.scan(Vec::<<DummyBody as Body>::Transformation>::with_capacity(42), acc)
+            zip.scan(Vec::<<DummyBody as RigidBody>::Transformation>::with_capacity(42), acc)
                 .collect_vec();
         }
         #[cfg(feature = "accumulate")]
