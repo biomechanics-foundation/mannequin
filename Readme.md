@@ -1,4 +1,4 @@
-# Pinocchio
+# Mannequin
 
 > **Warning: Crate still heavily under construction**
 

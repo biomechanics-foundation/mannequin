@@ -3,6 +3,14 @@
 version = 3
 
 [[package]]
+name = "Mannequin"
+version = "0.2.0"
+dependencies = [
+ "itertools",
+ "ndarray",
+]
+
+[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -126,14 +134,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "pinocchio"
-version = "0.1.0"
-dependencies = [
- "itertools",
- "ndarray",
 ]
 
 [[package]]
