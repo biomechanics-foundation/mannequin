@@ -324,3 +324,7 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/rust,rust-analyzer,visualstudiocode,intellij,clion,vim,macos,windows,linux
+
+
+# exclude private examples
+examples/priv_*.rs
