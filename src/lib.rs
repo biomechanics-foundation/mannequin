@@ -6,8 +6,14 @@
 //!             are uses substantives (i.e., omit a `get_` prefix) much like the standard library.
 //!             Callback methods have a `on_` prefix
 
-pub mod tree;
+pub mod arena;
+pub mod body;
+pub mod dummy;
+pub mod iterable_tree;
 
-pub use tree::iterator::DepthFirstIteration;
-pub use tree::visitable::{Accumulable, Visitable};
-pub use tree::visiting::{Visiting, Visitor};
+pub use arena::{ArenaNode, ArenaTree};
+pub use body::{acc, Accumulator, Body};
+pub use iterable_tree::{
+    IterableTree, Node, Order,
+    Order::{BreadthFirst, DepthFirst, Unordered},
+};
