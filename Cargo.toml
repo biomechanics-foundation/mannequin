@@ -1,5 +1,5 @@
 [package]
-name = "Mannequin"
+name = "mannequin"
 version = "0.2.0"
 authors = ["Stefan Ulbrich"]
 documentation = "https://github.com/biomechanics-foundation/mannequin"
