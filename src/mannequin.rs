@@ -12,9 +12,9 @@ use std::marker::PhantomData;
 pub trait Forward<IT, RB>
 where
     IT: TreeIterable<RB>,
-    RB: Rigid<Parameter = Self::Parameter>,
+    RB: Rigid,
 {
-    type Parameter;
+    type Parameter: IntoIterator<Item = RB::Parameter>;
     type Array;
 
     fn solve(&mut self, tree: &IT, param: Self::Parameter, target_refs: &[IT::NodeRef]) -> Self::Array;
@@ -25,10 +25,10 @@ pub trait Inverse<IT, RB, FK>
 where
     // Avoid mixing of backends
     IT: TreeIterable<RB>,
-    RB: Rigid<Parameter = Self::Parameter>,
-    FK: Forward<IT, RB, Parameter = RB::Parameter, Array = Self::Array>,
+    RB: Rigid,
+    FK: Forward<IT, RB, Array = Self::Array>,
 {
-    type Parameter;
+    type Parameter: IntoIterator<Item = RB::Parameter>;
     type Array;
 
     fn solve(
@@ -51,8 +51,8 @@ pub struct Mannequin<IT, RB, FK, IK>
 where
     RB: Rigid,
     IT: TreeIterable<RB>,
-    FK: Forward<IT, RB, Parameter = RB::Parameter>,
-    IK: Inverse<IT, RB, FK, Parameter = RB::Parameter, Array = FK::Array>,
+    FK: Forward<IT, RB>,
+    IK: Inverse<IT, RB, FK, Array = FK::Array>,
 {
     pub tree: IT,
     pub fk: FK,
@@ -64,8 +64,8 @@ impl<IT, RB, FK, IK> Mannequin<IT, RB, FK, IK>
 where
     RB: Rigid,
     IT: TreeIterable<RB>,
-    FK: Forward<IT, RB, Parameter = RB::Parameter>,
-    IK: Inverse<IT, RB, FK, Parameter = RB::Parameter, Array = FK::Array>,
+    FK: Forward<IT, RB>,
+    IK: Inverse<IT, RB, FK, Array = FK::Array>,
 {
     pub fn new(tree: IT, foward_kinematics: FK, inverse_kinematics: IK) -> Self {
         Mannequin {

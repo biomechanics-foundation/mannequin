@@ -13,7 +13,10 @@ pub trait Nodelike<T> {
     fn is_leaf(&self) -> bool;
     fn get(&self) -> &T;
 
-    // Note: a get chidren would be useful but it is quite a challenge to have an
+    /// Get the node's distance to its root node. Required for computing accumulations.
+    fn depth(&self) -> usize;
+
+    // Note: a get chidren would be useful but it is quite a challenge (open branch for that) to have an
     // associated type `NodeRef`` and enfore equality with the `NodeRef` in `TreeIterable`!.
     // Therefor this has been (will be) added there
 }

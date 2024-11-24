@@ -1,17 +1,28 @@
 #![allow(unused_variables)]
 
-use ndarray::{Array1, Array2, Array4};
+use core::fmt;
 
 use crate::{accumulate, ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Rigid, TreeIterable};
+use itertools::Itertools;
+use ndarray::parallel::prelude::*;
+use ndarray::prelude::*;
+use ndarray::{Array1, Array2, Array4};
 
+#[derive(Debug, Default)]
 struct Link {}
+
+impl fmt::Display for Link {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Just a link")
+    }
+}
 
 impl Rigid for Link {
     type Transformation = Array2<f64>;
 
     type Point = Array1<f64>;
 
-    type Parameter = Array1<f64>;
+    type Parameter = f64;
 
     fn transformation(&self, param: &Self::Parameter) -> Self::Transformation {
         todo!()
@@ -60,22 +71,50 @@ impl Forward<ArenaTree<Link>, Link> for SimpleFK {
 
 struct DifferentialIK {}
 
+type DifferentialIKParameter = <DifferentialIK as Inverse<ArenaTree<Link>, Link, SimpleFK>>::Parameter;
+type DifferentialIKArray = <DifferentialIK as Inverse<ArenaTree<Link>, Link, SimpleFK>>::Array;
+
 impl DifferentialIK {
-    pub fn jacobian(&self, tree: &ArenaTree<Link>) {
+    pub fn jacobian(&self, tree: &ArenaTree<Link>, param: DifferentialIKParameter) -> DifferentialIKArray {
+        let ndof = 3;
+        let ntcp = 2;
+
+        // Assumption: row-based
+        let mut jacobian = Array2::<f64>::zeros((ndof, ntcp));
+
         #[cfg(not(feature = "accumulate"))]
         {
-            let param = &[1.0, 2.0, 3.0];
-            let zip = tree
-                .iter(DepthFirst, &[])
-                .zip(param.iter())
-                .scan(Vec::<<Link as Rigid>::Transformation>::with_capacity(42), accumulate)
-                .for_each(|a| {});
+            jacobian
+                .axis_iter_mut(Axis(0))
+                .into_par_iter()
+                .zip(
+                    tree.iter(DepthFirst, &[])
+                        .zip(param.iter())
+                        .scan(Vec::<<Link as Rigid>::Transformation>::with_capacity(42), accumulate)
+                        //.into_par_iter() // not implemented yet
+                        .collect_vec()
+                        .into_par_iter(),
+                )
+                .for_each(|(row, (node, trafo))| {
+                    println!("{row}, {node}, {trafo}");
+                    // TODO iterte over subtree and fill the columns (non-parallel iteration in chunks of three)
+                });
         }
         #[cfg(feature = "accumulate")]
         {
-            // Want to use this!
-            tree.iter(DepthFirst, &[]).accumulate(param, 32).collect_vec();
+            jacobian
+                .axis_iter_mut(Axis(0))
+                .into_par_iter()
+                .zip(
+                    tree.iter(DepthFirst, &[])
+                        .accumulate(param, 42)
+                        //.into_par_iter() // not implemented yet
+                        .collect_vec()
+                        .into_par_iter(),
+                )
+                .for_each(|(row, (node, trafo))| println!("{row}, {node}, {trafo}"));
         }
+        jacobian
     }
 }
 

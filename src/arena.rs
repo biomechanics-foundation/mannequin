@@ -1,5 +1,7 @@
 /*! Implementation of a tree iteration with [arena allocation](https://en.wikipedia.org/wiki/Region-based_memory_management) */
 
+use core::fmt;
+
 use crate::{Nodelike, Order, TreeIterable};
 
 /// Iterator for a depth-first iteration when the data is not already sorted accordingly
@@ -61,11 +63,13 @@ impl<'a, T> Iterator for BreadthFirstIterator<'a, T> {
 }
 
 /// A node structure to be used in an arena allocated tree. Fields are used to speed up iteration
+#[derive(Debug)]
 pub struct ArenaNode<T> {
     payload: T,
     node_ref: usize,
     next_sibling: usize,
     children: Vec<usize>,
+    depth: usize,
 }
 
 impl<T> Nodelike<T> for ArenaNode<T> {
@@ -75,6 +79,23 @@ impl<T> Nodelike<T> for ArenaNode<T> {
 
     fn get(&self) -> &T {
         &self.payload
+    }
+
+    fn depth(&self) -> usize {
+        self.depth
+    }
+}
+
+impl<T> fmt::Display for ArenaNode<T>
+where
+    T: fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NodeRef {}, children: {:?}, payload: {} ",
+            self.node_ref, self.children, self.payload
+        )
     }
 }
 
