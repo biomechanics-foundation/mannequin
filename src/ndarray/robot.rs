@@ -1,15 +1,17 @@
+#![allow(unused_variables)]
+
 use ndarray::{Array1, Array2, Array4};
 
-use crate::{ArenaTree, Forward, Inverse, Mannequin, Rigid};
+use crate::{accumulate, ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Rigid, TreeIterable};
 
-struct RobotLink {}
+struct Link {}
 
-impl Rigid for RobotLink {
+impl Rigid for Link {
     type Transformation = Array2<f64>;
 
     type Point = Array1<f64>;
 
-    type Parameter = f64;
+    type Parameter = Array1<f64>;
 
     fn transformation(&self, param: &Self::Parameter) -> Self::Transformation {
         todo!()
@@ -40,38 +42,58 @@ impl Rigid for RobotLink {
     }
 }
 
-struct RobotFK {}
-impl Forward<ArenaTree<RobotFK>, RobotLink> for RobotFK {
+struct SimpleFK {}
+impl Forward<ArenaTree<Link>, Link> for SimpleFK {
     type Parameter = Array1<f64>;
 
     type Array = Array2<f64>;
 
     fn solve(
         &mut self,
-        tree: &ArenaTree<RobotFK>,
+        tree: &ArenaTree<Link>,
         param: Self::Parameter,
-        target_refs: &[<ArenaTree<RobotFK> as crate::TreeIterable>::NodeRef],
+        target_refs: &[<ArenaTree<Link> as crate::TreeIterable<Link>>::NodeRef],
     ) -> Self::Array {
         todo!()
     }
 }
 
-struct RobotIK {}
-impl Inverse for RobotIK {
-    type Parameter;
+struct DifferentialIK {}
 
-    type Array;
+impl DifferentialIK {
+    pub fn jacobian(&self, tree: &ArenaTree<Link>) {
+        #[cfg(not(feature = "accumulate"))]
+        {
+            let param = &[1.0, 2.0, 3.0];
+            let zip = tree
+                .iter(DepthFirst, &[])
+                .zip(param.iter())
+                .scan(Vec::<<Link as Rigid>::Transformation>::with_capacity(42), accumulate)
+                .for_each(|a| {});
+        }
+        #[cfg(feature = "accumulate")]
+        {
+            // Want to use this!
+            tree.iter(DepthFirst, &[]).accumulate(param, 32).collect_vec();
+        }
+    }
+}
+
+impl Inverse<ArenaTree<Link>, Link, SimpleFK> for DifferentialIK {
+    type Parameter = Array1<f64>;
+
+    type Array = Array2<f64>;
 
     fn solve(
         &mut self,
-        tree: &IT,
-        fk: &FK,
+        tree: &ArenaTree<Link>,
+        fk: &SimpleFK,
         param: Self::Parameter,
-        target_refs: &[IT::NodeRef],
+        target_refs: &[<ArenaTree<Link> as crate::TreeIterable<Link>>::NodeRef],
         target_val: &[Self::Array],
     ) -> Self::Parameter {
         todo!()
     }
 }
 
-type Robot = Mannequin<ArenaTree<RobotLink>, RobotLink, RobotFK, RobotIK>;
+type Robot = Mannequin<ArenaTree<Link>, Link, SimpleFK, DifferentialIK>;
