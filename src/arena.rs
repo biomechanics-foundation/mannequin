@@ -5,7 +5,7 @@ use core::fmt;
 use crate::{Nodelike, Order, TreeIterable};
 
 /// Iterator for a depth-first iteration when the data is not already sorted accordingly
-pub struct DepthFirstIterator<'a, 'b, T>
+pub struct DepthFirstIterator<'a, 'b, T: 'static>
 where
     'a: 'b,
 {
@@ -16,7 +16,7 @@ where
     // stack2: Vec<std::slice::Iter<'b, <ArenaTree<T> as IterableTree>::NodeRef>>,
 }
 
-impl<'a, 'b, T> DepthFirstIterator<'a, 'b, T> {
+impl<'a, 'b, T: 'static> DepthFirstIterator<'a, 'b, T> {
     // TODO did not manage to over write the root nodes :(
     pub fn new(tree: &'a ArenaTree<T>, root: &'b [<ArenaTree<T> as TreeIterable<T>>::NodeRef]) -> Self {
         let mut stack = Vec::with_capacity(tree.max_depth);
@@ -118,13 +118,18 @@ impl<T> ArenaTree<T> {
     }
 }
 
-impl<T> TreeIterable<T> for ArenaTree<T> {
+impl<T: 'static> TreeIterable<T> for ArenaTree<T> {
     type Node = ArenaNode<T>;
     type NodeRef = usize;
 
-    fn iter<'a, 'b>(&'a self, traversal: Order, root: &'b [Self::NodeRef]) -> Box<dyn Iterator<Item = &Self::Node> + 'b>
+    fn iter<'a, 'b, 'c>(
+        &'a self,
+        traversal: Order,
+        root: &'b [Self::NodeRef],
+    ) -> Box<dyn Iterator<Item = &Self::Node> + 'c>
     where
-        'a: 'b,
+        'a: 'c, //  tree outlives the iterator
+        'b: 'c, //  sodes outlives the root list
     {
         let root = if root.is_empty() { &self.roots } else { root };
 

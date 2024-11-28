@@ -23,16 +23,13 @@ pub trait Nodelike<T> {
 
 /// A datastructure to hold a tree hierarchy of data contained in `NodeLike`s.
 pub trait TreeIterable<T> {
-    type Node: Nodelike<T>;
+    type Node: 'static + Nodelike<T>; // cannot hold references
     type NodeRef;
 
-    fn iter<'a, 'b>(
-        &'a self,
-        traversal: Order,
-        root: &'b [Self::NodeRef],
-    ) -> Box<dyn Iterator<Item = &Self::Node> + 'b>
+    fn iter<'a, 'b, 'c>(&'a self, traversal: Order, root: &'b [Self::NodeRef]) -> impl Iterator<Item = &Self::Node>
     where
-        'a: 'b;
+        'a: 'c,
+        'b: 'c;
     // fn iter_mut(&self, traversal: Order, root: Option<Self::NodeRef>) -> Self::Iterator;
     // fn add(&mut self, node: Self::Node, parent: Option<Self::Node>) -> Self::NodeRef;
     // fn pop(&mut self, node_ref: Self::NodeRef) -> Self::Node;

@@ -64,7 +64,7 @@ where
     fn accumulate(self, param: &[T::Parameter], max_depth: usize) -> impl Iterator<Item = (&'a N, T::Transformation)>;
 }
 
-impl<'a, S, T> Accumulator<'a, S, T> for Box<dyn Iterator<Item = &'a S>>
+impl<'a, 'b, S, T> Accumulator<'a, S, T> for Box<dyn Iterator<Item = &'a S> + 'b>
 where
     S: Nodelike<T>,
     T: Rigid,

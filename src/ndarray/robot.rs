@@ -78,9 +78,25 @@ impl DifferentialIK {
     pub fn jacobian(&self, tree: &ArenaTree<Link>, param: DifferentialIKParameter) -> DifferentialIKArray {
         let ndof = 3;
         let ntcp = 2;
-
+        let max = 42;
         // Assumption: row-based
         let mut jacobian = Array2::<f64>::zeros((ndof, ntcp));
+
+        jacobian
+            .axis_iter_mut(Axis(0))
+            .into_par_iter()
+            .zip(tree.iter(DepthFirst, &[]).accumulate(param, max).into_par_iter())
+            .for_each(|(row, (node, trafo))| {
+                println!("{row}, {node}, {trafo}");
+
+                // tree
+                //     .iter(DepthFirst, &[tree.node_ref(node)])
+                //     .accumulate(param, max)
+                //     .zip(row.iter_chunks(3))
+                //     .for_each(|(cell, (node, transformation)| {
+                //         // compute displacement
+                //     });
+            });
 
         #[cfg(not(feature = "accumulate"))]
         {
