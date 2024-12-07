@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use crate::{accumulate, ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Rigid, TreeIterable};
+use crate::{accumulate, Accumulator, ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Rigid, TreeIterable};
 use itertools::Itertools;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;

@@ -92,7 +92,7 @@ mod tests {
     fn smoke_test() {
         let root = [0usize];
         {
-            let a = ArenaTree::<i32>::new(DepthFirst);
+            let a = ArenaTree::<i32>::new(Some(DepthFirst));
             let mut i = a.iter(DepthFirst, &root);
             i.next();
 
@@ -118,7 +118,7 @@ mod tests {
         }
         #[cfg(feature = "accumulate")]
         {
-            let tree = ArenaTree::<DummyBody>::new(DepthFirst);
+            let tree = ArenaTree::<DummyBody>::new(Some(DepthFirst));
             let param = &[1.0, 2.0, 3.0];
             let iter = tree.iter(DepthFirst, &[]);
             iter.accumulate(param, 32).collect_vec();

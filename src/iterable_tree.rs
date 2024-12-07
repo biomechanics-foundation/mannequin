@@ -1,11 +1,18 @@
 /// Definition of the interfaces for tree iteration
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum MannequinError {
+    #[error("Node reference {0} is out of bound")]
+    ReferenceOutOfBound(usize),
+}
 
 /// Order of iteration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Order {
     DepthFirst,
     BreadthFirst,
-    Unordered,
+    // Unordered,
 }
 
 /// Container that holds data in a `TreeIterable`
@@ -26,12 +33,14 @@ pub trait TreeIterable<T> {
     type Node: 'static + Nodelike<T>; // cannot hold references
     type NodeRef;
 
-    fn iter<'a, 'b, 'c>(&'a self, traversal: Order, root: &'b [Self::NodeRef]) -> impl Iterator<Item = &Self::Node>
+    fn iter<'a, 'b, 'c>(&'a self, traversal: Order, roots: &'b [Self::NodeRef]) -> impl Iterator<Item = &Self::Node>
     where
         'a: 'c,
         'b: 'c;
+    fn add(&mut self, load: T, parent: Option<Self::NodeRef>) -> Result<Self::NodeRef, MannequinError>;
+
+    // TODO implement these members
     // fn iter_mut(&self, traversal: Order, root: Option<Self::NodeRef>) -> Self::Iterator;
-    // fn add(&mut self, node: Self::Node, parent: Option<Self::Node>) -> Self::NodeRef;
     // fn pop(&mut self, node_ref: Self::NodeRef) -> Self::Node;
     // fn node(&self, node_ref: Self::NodeRef) -> &Self::Node;
     // fn children(&self, node_ref: Self::NodeRef) -> &[self:NodeRef];
