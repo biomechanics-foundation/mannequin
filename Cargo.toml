@@ -16,6 +16,7 @@ description = "Direkt and inverse kinematics for biomechanics, robotics and char
 [dependencies]
 itertools = "0.13.0"
 ndarray = { version = "0.16.1", optional = true, features = ["approx", "blas", "rayon"] }
+thiserror = "2.0.4"
 
 [features]
 # Feature to enable the accumulation shortcut

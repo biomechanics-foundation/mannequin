@@ -30,8 +30,8 @@ pub mod rigid;
 
 pub use arena::{ArenaNode, ArenaTree};
 pub use iterable_tree::{
-    Nodelike, Order,
-    Order::{BreadthFirst, DepthFirst, Unordered},
+    MannequinError, Nodelike, Order,
+    Order::{BreadthFirst, DepthFirst},
     TreeIterable,
 };
 pub use mannequin::{Forward, Inverse, Mannequin};
