@@ -3,7 +3,7 @@
 use crate::Nodelike;
 
 /// A Rigid Body represents a single, rigid link connected to other links via a joint.
-pub trait Rigid {
+pub trait Rigid: PartialEq {
     /// E.g., 4x4 matrix, (3x1, 3x3), quaternions ...
     type Transformation: Clone;
     /// Vec, \[f64;4\], ...

@@ -29,7 +29,7 @@ pub trait Nodelike<T> {
 }
 
 /// A datastructure to hold a tree hierarchy of data contained in `NodeLike`s.
-pub trait TreeIterable<T> {
+pub trait TreeIterable<T: PartialEq> {
     type Node: 'static + Nodelike<T>; // cannot hold references
     type NodeRef;
 
@@ -37,7 +37,16 @@ pub trait TreeIterable<T> {
     where
         'a: 'c,
         'b: 'c;
+
+    /// Add a new node to the tree. A tree can have multiple root nodes; their parents are `None`
     fn add(&mut self, load: T, parent: Option<Self::NodeRef>) -> Result<Self::NodeRef, MannequinError>;
+
+    /// Optimizes the tree for a traversal order after all nodes have been added. May also
+    /// generate caches if applicable.
+    /// **Warning** breaks all existing references in your program!
+    fn optimize(&mut self, for_traversal: Order);
+
+    fn get_by_load(&self, load: &T) -> Option<Self::NodeRef>;
 
     // TODO implement these members
     // fn iter_mut(&self, traversal: Order, root: Option<Self::NodeRef>) -> Self::Iterator;

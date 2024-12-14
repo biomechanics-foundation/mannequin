@@ -4,6 +4,7 @@
 
 use crate::Rigid;
 
+#[derive(Debug, PartialEq)]
 pub struct DummyBody {
     value: f64,
 }

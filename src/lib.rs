@@ -27,6 +27,7 @@ pub mod dummy;
 pub mod iterable_tree;
 pub mod mannequin;
 pub mod rigid;
+pub mod utils;
 
 pub use arena::{ArenaNode, ArenaTree};
 pub use iterable_tree::{
