@@ -8,7 +8,7 @@ use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 use ndarray::{Array1, Array2, Array4};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 struct Link {}
 
 impl fmt::Display for Link {
@@ -82,21 +82,21 @@ impl DifferentialIK {
         // Assumption: row-based
         let mut jacobian = Array2::<f64>::zeros((ndof, ntcp));
 
-        jacobian
-            .axis_iter_mut(Axis(0))
-            .into_par_iter()
-            .zip(tree.iter(DepthFirst, &[]).accumulate(param, max).into_par_iter())
-            .for_each(|(row, (node, trafo))| {
-                println!("{row}, {node}, {trafo}");
+        // jacobian
+        //     .axis_iter_mut(Axis(0))
+        //     .into_par_iter()
+        //     .zip(tree.iter(DepthFirst, &[]).accumulate(param, max).into_par_iter())
+        //     .for_each(|(row, (node, trafo))| {
+        //         println!("{row}, {node}, {trafo}");
 
-                // tree
-                //     .iter(DepthFirst, &[tree.node_ref(node)])
-                //     .accumulate(param, max)
-                //     .zip(row.iter_chunks(3))
-                //     .for_each(|(cell, (node, transformation)| {
-                //         // compute displacement
-                //     });
-            });
+        //         // tree
+        //         //     .iter(DepthFirst, &[tree.node_ref(node)])
+        //         //     .accumulate(param, max)
+        //         //     .zip(row.iter_chunks(3))
+        //         //     .for_each(|(cell, (node, transformation)| {
+        //         //         // compute displacement
+        //         //     });
+        //     });
 
         {
             jacobian
@@ -104,7 +104,7 @@ impl DifferentialIK {
                 .into_par_iter()
                 .zip(
                     tree.iter(DepthFirst, &[])
-                        .accumulate(param, 42)
+                        .accumulate(param.as_slice().expect("Cannot convert parameters to slice!"), 42)
                         //.into_par_iter() // not implemented yet
                         .collect_vec()
                         .into_par_iter(),
