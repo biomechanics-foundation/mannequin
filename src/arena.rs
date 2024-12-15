@@ -423,4 +423,24 @@ mod tests {
     }
 
     // TODO add unit test for a `Box`ed node load
+    #[test]
+    fn test_boxed() {
+        let mut tree = ArenaTree::<Box<usize>>::new(Some(DepthFirst));
+        let first = tree.add(Box::new(1), None).unwrap();
+        // Add the second root first to see whether resorting of the vector works
+        let second = tree.add(Box::new(5), None).unwrap();
+        let third = tree.add(Box::new(2), Some(first)).unwrap();
+        tree.add(Box::new(4), Some(first)).unwrap();
+        tree.add(Box::new(3), Some(third)).unwrap();
+        tree.add(Box::new(6), Some(second)).unwrap();
+
+        // This uses the depth first iterator!
+        let result = tree
+            .iter(DepthFirst, &[first, second])
+            // TODO check whether the clone is a problem or not.
+            .map(|i| i.get().as_ref())
+            .copied()
+            .collect_vec();
+        assert_eq!(result, &[1, 2, 3, 4, 5, 6]);
+    }
 }
