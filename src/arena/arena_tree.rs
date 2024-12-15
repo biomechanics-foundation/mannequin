@@ -301,10 +301,11 @@ where
 mod tests {
 
     use itertools::Itertools;
+    use test_log;
 
     use crate::*;
 
-    #[test]
+    #[test_log::test]
     fn test_adding_iteration() {
         //  1    5
         // | \   |

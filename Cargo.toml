@@ -7,6 +7,7 @@ edition = "2021"
 homepage = "https://github.com/biomechanics-foundation/mannequin"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/biomechanics-foundation/mannequin"
+rust-version = "1.67"
 
 readme = "Readme.md"
 description = "Direkt and inverse kinematics for biomechanics, robotics and character animation"
@@ -16,7 +17,12 @@ description = "Direkt and inverse kinematics for biomechanics, robotics and char
 [dependencies]
 itertools = "0.13.0"
 ndarray = { version = "0.16.1", optional = true, features = ["approx", "blas", "rayon"] }
-thiserror = "2.0.4"
+thiserror = "2.0.7"
+tracing = "0.1.41"
+tracing-attributes = "0.1.28"
 
 [features]
 ndarray = ["dep:ndarray"]
+
+[dev-dependencies]
+test-log = { version = "0.2.16", features = ["trace"] }
