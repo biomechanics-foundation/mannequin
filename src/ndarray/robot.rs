@@ -98,25 +98,6 @@ impl DifferentialIK {
                 //     });
             });
 
-        #[cfg(not(feature = "accumulate"))]
-        {
-            jacobian
-                .axis_iter_mut(Axis(0))
-                .into_par_iter()
-                .zip(
-                    tree.iter(DepthFirst, &[])
-                        .zip(param.iter())
-                        .scan(Vec::<<Link as Rigid>::Transformation>::with_capacity(42), accumulate)
-                        //.into_par_iter() // not implemented yet
-                        .collect_vec()
-                        .into_par_iter(),
-                )
-                .for_each(|(row, (node, trafo))| {
-                    println!("{row}, {node}, {trafo}");
-                    // TODO iterte over subtree and fill the columns (non-parallel iteration in chunks of three)
-                });
-        }
-        #[cfg(feature = "accumulate")]
         {
             jacobian
                 .axis_iter_mut(Axis(0))

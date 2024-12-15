@@ -105,18 +105,6 @@ mod tests {
             .enumerate()
             .for_each(|(idx, el)| println!("Accumulated {el} for node {idx}"));
         }
-        #[cfg(not(feature = "accumulate"))]
-        {
-            let tree = ArenaTree::<DummyBody>::new(DepthFirst);
-            let param = &[1.0, 2.0, 3.0];
-            let zip = tree.iter(DepthFirst, &[]).zip(param.iter());
-            zip.scan(
-                Vec::<<DummyBody as Rigid>::Transformation>::with_capacity(42),
-                accumulate,
-            )
-            .collect_vec();
-        }
-        #[cfg(feature = "accumulate")]
         {
             let tree = ArenaTree::<DummyBody>::new(Some(DepthFirst));
             let param = &[1.0, 2.0, 3.0];
