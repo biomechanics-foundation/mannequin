@@ -203,6 +203,34 @@ where
         }
     }
 
+    fn iter_mut<'a, 'b, 'c>(
+        &'a mut self,
+        traversal: Order,
+        roots: &'b [Self::NodeRef],
+    ) -> Box<dyn Iterator<Item = &'a Self::Node> + 'c>
+    where
+        'a: 'c,
+        'b: 'c,
+    {
+        Box::new(
+            roots
+                .iter_mut()
+                .map(|root| {
+                    self.nodes
+                        .iter_mut()
+                        .enumerate()
+                        .skip_while(|(i, _)| i < root)
+                        .take_while(|(i, _)| {
+                            // Can the boundary checks be disabled for speed? Needs unsafe?
+                            let node = self.nodes.get(*root).expect("Out of bound in managed arena");
+                            *i <= node.node_ref + node.width
+                        })
+                        .map(|(_, n)| n)
+                })
+                .flatten(),
+        )
+    }
+
     fn add(&mut self, load: T, parent: Option<Self::NodeRef>) -> Result<Self::NodeRef, MannequinError> {
         self.breadh_first_cache = None;
         self.depth_first_cache = None;

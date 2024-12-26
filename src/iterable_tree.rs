@@ -38,6 +38,16 @@ pub trait TreeIterable<T: PartialEq> {
         'a: 'c,
         'b: 'c;
 
+    // Might be pretty complex but good for caching?
+    fn iter_mut<'a, 'b, 'c>(
+        &'a mut self,
+        traversal: Order,
+        roots: &'b [Self::NodeRef],
+    ) -> impl Iterator<Item = &'a mut Self::Node>
+    where
+        'a: 'c,
+        'b: 'c;
+
     /// Add a new node to the tree. A tree can have multiple root nodes; their parents are `None`
     fn add(&mut self, load: T, parent: Option<Self::NodeRef>) -> Result<Self::NodeRef, MannequinError>;
 
