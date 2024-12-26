@@ -3,6 +3,9 @@
 use crate::Nodelike;
 
 /// A Rigid Body represents a single, rigid link connected to other links via a joint.
+///
+/// Wraps linear algebra transformations such that backends
+/// only need to implement this trait.
 pub trait Rigid: PartialEq {
     /// E.g., 4x4 matrix, (3x1, 3x3), quaternions ...
     type Transformation: Clone;
@@ -28,6 +31,9 @@ pub trait Rigid: PartialEq {
 
     /// Returns the eutral element wrt. the transoformation convention used
     fn neutral_element() -> Self::Transformation;
+
+    // Invert a transformation
+    fn invert(trafo: &Self::Transformation) -> Self::Transformation;
 
     /// Concat two transformations
     fn concat(first: &Self::Transformation, second: &Self::Transformation) -> Self::Transformation;
@@ -92,7 +98,7 @@ mod tests {
     fn smoke_test() {
         let root = [0usize];
         {
-            let a = ArenaTree::<i32>::new(Some(DepthFirst));
+            let a = ArenaTree::<i32>::new();
             let mut i = a.iter(DepthFirst, &root);
             i.next();
 
@@ -106,10 +112,10 @@ mod tests {
             .for_each(|(idx, el)| println!("Accumulated {el} for node {idx}"));
         }
         {
-            let tree = ArenaTree::<DummyBody>::new(Some(DepthFirst));
+            let tree = ArenaTree::<DummyBody>::new();
             let param = &[1.0, 2.0, 3.0];
             let iter = tree.iter(DepthFirst, &[]);
-            iter.accumulate(param, 32).collect_vec();
+            let res = iter.accumulate(param, 32).collect_vec();
         }
     }
 }

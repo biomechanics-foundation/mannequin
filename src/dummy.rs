@@ -47,4 +47,8 @@ impl Rigid for DummyBody {
     fn localize(&self, other: &Self::Point) -> Self::Point {
         todo!()
     }
+
+    fn invert(trafo: &Self::Transformation) -> Self::Transformation {
+        todo!()
+    }
 }

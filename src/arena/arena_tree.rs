@@ -1,5 +1,6 @@
 use core::fmt;
 use itertools::Itertools;
+use std::mem::uninitialized;
 
 use crate::{
     utils::sort_by_indices,
@@ -119,12 +120,13 @@ impl<T> ArenaTree<T> {
             max_depth: 42,
         }
     }
+
     /// Contructor. Sorting indicates whether the elements are stored to
     /// make either deoth or breadth first traversal efficient (slow insertion). `None` indicates
     /// that the data will be unordered (fast insertion, slower traversal).
-    pub fn new(sorting: Option<Order>) -> Self {
+    pub fn new() -> Self {
         ArenaTree {
-            sorting,
+            sorting: None,
             nodes: vec![],
             depth_first_cache: None,
             breadh_first_cache: None,
@@ -169,7 +171,7 @@ where
         &'a self,
         traversal: Order,
         roots: &'b [Self::NodeRef],
-    ) -> Box<dyn Iterator<Item = &Self::Node> + 'c>
+    ) -> Box<dyn Iterator<Item = &'a Self::Node> + 'c>
     where
         'a: 'c, //  tree outlives the iterator
         'b: 'c, //  sodes outlives the root list
@@ -292,8 +294,16 @@ where
         }
     }
 
-    fn get_by_load(&self, load: &T) -> Option<Self::NodeRef> {
+    fn get_ref(&self, node: &Self::Node) -> Self::NodeRef {
+        node.node_ref
+    }
+
+    fn get_ref_by_load(&self, load: &T) -> Option<Self::NodeRef> {
         self.nodes.iter().position(|node| node.load == *load)
+    }
+
+    fn get_node_by_ref(&self, node_ref: &Self::NodeRef) -> Option<&Self::Node> {
+        self.nodes.iter().find(|node| node.node_ref == *node_ref)
     }
 }
 
@@ -313,7 +323,7 @@ mod tests {
         // |
         // 3
 
-        let mut tree = ArenaTree::<usize>::new(Some(DepthFirst));
+        let mut tree = ArenaTree::<usize>::new();
         let mut first = tree.add(1, None).unwrap();
         // Add the second root first to see whether resorting of the vector works
         let mut second = tree.add(5, None).unwrap();
@@ -340,8 +350,8 @@ mod tests {
         println!("{:?}", tree.nodes.iter().map(|n| n.width).collect_vec());
 
         // references invalidated by optimize, the roots by load
-        first = tree.get_by_load(&1).unwrap();
-        second = tree.get_by_load(&5).unwrap();
+        first = tree.get_ref_by_load(&1).unwrap();
+        second = tree.get_ref_by_load(&5).unwrap();
         assert_eq!(second, 4);
         println!("{first} {second}");
         // Now check whether iterating over the sorted vec works
@@ -360,7 +370,7 @@ mod tests {
     // TODO add unit test for a `Box`ed node load
     #[test]
     fn test_boxed() {
-        let mut tree = ArenaTree::<Box<usize>>::new(Some(DepthFirst));
+        let mut tree = ArenaTree::<Box<usize>>::new();
         let first = tree.add(Box::new(1), None).unwrap();
         // Add the second root first to see whether resorting of the vector works
         let second = tree.add(Box::new(5), None).unwrap();

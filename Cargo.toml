@@ -16,7 +16,7 @@ description = "Direkt and inverse kinematics for biomechanics, robotics and char
 
 [dependencies]
 itertools = "0.13.0"
-ndarray = { version = "0.16.1", optional = true, features = ["approx", "blas", "rayon"] }
+ndarray = { version = "0.16.1", optional = true, features = ["approx", "rayon"] }
 thiserror = "2.0.7"
 tracing = "0.1.41"
 tracing-attributes = "0.1.28"

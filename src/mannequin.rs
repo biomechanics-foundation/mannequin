@@ -15,9 +15,9 @@ where
     RB: Rigid,
 {
     type Parameter: IntoIterator<Item = RB::Parameter>;
-    type Array;
+    type Transformation;
 
-    fn solve(&mut self, tree: &IT, param: Self::Parameter, target_refs: &[IT::NodeRef]) -> Self::Array;
+    fn solve(&mut self, tree: &IT, param: Self::Parameter, target_refs: &[IT::NodeRef]) -> Vec<Self::Transformation>;
 }
 
 /// Trait representing a stateful inverse kinematics algoritm.
@@ -26,7 +26,7 @@ where
     // Avoid mixing of backends
     IT: TreeIterable<RB>,
     RB: Rigid,
-    FK: Forward<IT, RB, Array = Self::Array>,
+    FK: Forward<IT, RB, Transformation = Self::Array>,
 {
     type Parameter: IntoIterator<Item = RB::Parameter>;
     type Array;
@@ -52,7 +52,7 @@ where
     RB: Rigid,
     IT: TreeIterable<RB>,
     FK: Forward<IT, RB>,
-    IK: Inverse<IT, RB, FK, Array = FK::Array>,
+    IK: Inverse<IT, RB, FK, Array = FK::Transformation>,
 {
     pub tree: IT,
     pub fk: FK,
@@ -65,7 +65,7 @@ where
     RB: Rigid,
     IT: TreeIterable<RB>,
     FK: Forward<IT, RB>,
-    IK: Inverse<IT, RB, FK, Array = FK::Array>,
+    IK: Inverse<IT, RB, FK, Array = FK::Transformation>,
 {
     pub fn new(tree: IT, foward_kinematics: FK, inverse_kinematics: IK) -> Self {
         Mannequin {
@@ -77,7 +77,7 @@ where
     }
 
     /// Forward kinematics for the targets in `target_refs` and the joint positions in `param`.
-    pub fn forward(&mut self, param: FK::Parameter, target_refs: &[IT::NodeRef]) -> FK::Array {
+    pub fn forward(&mut self, param: FK::Parameter, target_refs: &[IT::NodeRef]) -> Vec<FK::Transformation> {
         self.fk.solve(&self.tree, param, target_refs)
     }
 

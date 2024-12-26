@@ -33,7 +33,7 @@ pub trait TreeIterable<T: PartialEq> {
     type Node: 'static + Nodelike<T>; // cannot hold references
     type NodeRef;
 
-    fn iter<'a, 'b, 'c>(&'a self, traversal: Order, roots: &'b [Self::NodeRef]) -> impl Iterator<Item = &Self::Node>
+    fn iter<'a, 'b, 'c>(&'a self, traversal: Order, roots: &'b [Self::NodeRef]) -> impl Iterator<Item = &'a Self::Node>
     where
         'a: 'c,
         'b: 'c;
@@ -46,7 +46,9 @@ pub trait TreeIterable<T: PartialEq> {
     /// **Warning** breaks all existing references in your program!
     fn optimize(&mut self, for_traversal: Order);
 
-    fn get_by_load(&self, load: &T) -> Option<Self::NodeRef>;
+    fn get_ref(&self, node: &Self::Node) -> Self::NodeRef;
+    fn get_ref_by_load(&self, load: &T) -> Option<Self::NodeRef>;
+    fn get_node_by_ref(&self, node_ref: &Self::NodeRef) -> Option<&Self::Node>;
 
     // TODO implement these members
     // fn iter_mut(&self, traversal: Order, root: Option<Self::NodeRef>) -> Self::Iterator;
