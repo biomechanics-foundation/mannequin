@@ -207,14 +207,14 @@ where
         &'a mut self,
         traversal: Order,
         roots: &'b [Self::NodeRef],
-    ) -> Box<dyn Iterator<Item = &'a Self::Node> + 'c>
+    ) -> Box<dyn Iterator<Item = &'a mut Self::Node> + 'c>
     where
         'a: 'c,
         'b: 'c,
     {
-        Box::new(
+        let res = Box::new(
             roots
-                .iter_mut()
+                .iter()
                 .map(|root| {
                     self.nodes
                         .iter_mut()
@@ -225,10 +225,12 @@ where
                             let node = self.nodes.get(*root).expect("Out of bound in managed arena");
                             *i <= node.node_ref + node.width
                         })
-                        .map(|(_, n)| n)
+                        .map(move |(_, n)| n)
                 })
                 .flatten(),
-        )
+        );
+
+        Box::new(self.nodes.iter_mut())
     }
 
     fn add(&mut self, load: T, parent: Option<Self::NodeRef>) -> Result<Self::NodeRef, MannequinError> {
