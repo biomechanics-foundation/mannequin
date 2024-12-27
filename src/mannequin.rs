@@ -4,7 +4,7 @@
  * realistic joints, muscle simulation, or classical inverse kinematics and obstacle avoidance.
  */
 
-use crate::{Rigid, TreeIterable};
+use crate::{Order::DepthFirst, Rigid, TransformationAccumulation, TreeIterable};
 use std::marker::PhantomData;
 
 /// Trait representing a stateful forward kinematics algoritm. For instance, it can represent a rigid body mannequin
@@ -14,10 +14,12 @@ where
     IT: TreeIterable<RB>,
     RB: Rigid,
 {
+    // TODO maybe change to slice
     type Parameter: IntoIterator<Item = RB::Parameter>;
     type Transformation;
 
-    fn solve(&mut self, tree: &IT, param: Self::Parameter, target_refs: &[IT::NodeRef]) -> Vec<Self::Transformation>;
+    // TODO this can have a default implementation
+    fn solve(&mut self, tree: &IT, params: Self::Parameter, target_refs: &[IT::NodeRef]) -> Vec<Self::Transformation>;
 }
 
 /// Trait representing a stateful inverse kinematics algoritm.

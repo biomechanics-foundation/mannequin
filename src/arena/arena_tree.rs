@@ -1,6 +1,9 @@
 use core::fmt;
 use itertools::Itertools;
-use std::mem::uninitialized;
+use std::{
+    iter::{repeat, repeat_with},
+    mem::uninitialized,
+};
 
 use crate::{
     utils::sort_by_indices,
@@ -219,7 +222,7 @@ where
             0
         };
 
-        println!("Adding {:?} to parent {:?}", load, parent);
+        // println!("Adding {:?} to parent {:?}", load, parent);
 
         let node_ref = self.nodes.len();
         let depth: usize;
@@ -253,10 +256,10 @@ where
         self.nodes
             .push(ArenaNode::new(load, node_ref, 0, vec![], depth, parent));
 
-        println!(
-            "Nodes after insert {:?}",
-            self.nodes.iter().map(|i| (&i.load, i.depth)).collect_vec()
-        );
+        // println!(
+        //     "Nodes after insert {:?}",
+        //     self.nodes.iter().map(|i| (&i.load, i.depth)).collect_vec()
+        // );
         Ok(node_ref)
     }
 

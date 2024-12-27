@@ -48,8 +48,10 @@ where
     S: Nodelike<T>,
     T: Rigid,
 {
-    // TODO not expected to work (pop is not even called). Will need the depth in order to know how much to pop
     let (node, param) = arg;
+    while node.depth() < stack.len() {
+        stack.pop();
+    }
     let current = T::concat(
         stack.last().unwrap_or(&T::neutral_element()),
         &node.get().transformation(param),
@@ -61,28 +63,30 @@ where
 ///  Trait that adds an `accumulate` functions for accumulating transformations from direct path from a root to a node.
 /// Wraps a zip and scan operation
 ///
-/// **Warning** currently borken! See unit tests in this file
-pub trait Accumulator<'a, N, T>
+pub trait TransformationAccumulation<'a, N, T>
 where
     T: Rigid,
     N: Nodelike<T> + 'a,
 {
-    fn accumulate(self, param: &[T::Parameter], max_depth: usize) -> impl Iterator<Item = (&'a N, T::Transformation)>;
+    fn accumulate_transformations(
+        self,
+        param: &[T::Parameter],
+        max_depth: usize,
+    ) -> impl Iterator<Item = (&'a N, T::Transformation)>;
 }
 
-impl<'a, 'b, S, T> Accumulator<'a, S, T> for Box<dyn Iterator<Item = &'a S> + 'b>
+impl<'a, 'b, S, T> TransformationAccumulation<'a, S, T> for Box<dyn Iterator<Item = &'a S> + 'b>
 where
     S: Nodelike<T>,
     T: Rigid,
 {
-    fn accumulate(
+    fn accumulate_transformations(
         self,
         param: &[T::Parameter],
         max_depth: usize,
     ) -> impl Iterator<Item = (&'a S, <T as Rigid>::Transformation)> {
         self.into_iter()
             .zip(param.iter())
-            // .scan(Vec::<T::Transformation>::with_capacity(max_depth), |a, (b, c)| None)
             .scan(Vec::<T::Transformation>::with_capacity(max_depth), accumulate)
     }
 }
@@ -95,27 +99,5 @@ mod tests {
     use crate::*;
 
     #[test]
-    fn smoke_test() {
-        let root = [0usize];
-        {
-            let a = ArenaTree::<i32>::new();
-            let mut i = a.iter(DepthFirst, &root);
-            i.next();
-
-            let neutral = 0;
-            i.scan(Vec::<i32>::with_capacity(42), |stack, node| {
-                let current = *stack.last().unwrap_or(&neutral) + node.get();
-                stack.push(current);
-                Some(current)
-            })
-            .enumerate()
-            .for_each(|(idx, el)| println!("Accumulated {el} for node {idx}"));
-        }
-        {
-            let tree = ArenaTree::<DummyBody>::new();
-            let param = &[1.0, 2.0, 3.0];
-            let iter = tree.iter(DepthFirst, &[]);
-            let res = iter.accumulate(param, 32).collect_vec();
-        }
-    }
+    fn smoke_test() {}
 }

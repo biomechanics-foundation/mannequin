@@ -36,7 +36,7 @@ pub use iterable_tree::{
     TreeIterable,
 };
 pub use mannequin::{Forward, Inverse, Mannequin};
-pub use rigid::{accumulate, Accumulator, Rigid};
+pub use rigid::{accumulate, Rigid, TransformationAccumulation};
 
 // Backends
 #[cfg(feature = "ndarray")]

@@ -1,7 +1,10 @@
 //! Implementation of traits as specializations for ArenaTree using ndarray
 #![allow(unused_variables)]
 
-use crate::{accumulate, Accumulator, ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Rigid, TreeIterable};
+use crate::{
+    accumulate, ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation,
+    TreeIterable,
+};
 use core::fmt;
 use itertools::Itertools;
 use ndarray::parallel::prelude::*;
@@ -71,20 +74,20 @@ impl Rigid for Link {
     }
 
     fn invert(trafo: &Self::Transformation) -> Self::Transformation {
-        let mut neutral = Self::neutral_element();
+        let mut result = Self::neutral_element();
         let rot = trafo.slice(s![..3, ..3]);
-        neutral.slice_mut(s![..3, ..3]).assign(&rot.t());
+        result.slice_mut(s![..3, ..3]).assign(&rot.t());
         let ipos = &trafo.slice(s![..3, 3]) * -1.0;
-        neutral.slice_mut(s![..3, 3]).assign(&ipos);
-        todo!()
+        result.slice_mut(s![..3, 3]).assign(&ipos);
+        result
     }
 }
 
 /// Specialization of a Forward Kinematics on an [ArenaTree]
-pub struct SimpleFK {
+pub struct FK {
     max_depth: usize,
 }
-impl Forward<ArenaTree<Link>, Link> for SimpleFK {
+impl Forward<ArenaTree<Link>, Link> for FK {
     type Parameter = Array1<f64>;
 
     type Transformation = Array2<f64>;
@@ -96,9 +99,11 @@ impl Forward<ArenaTree<Link>, Link> for SimpleFK {
         target_refs: &[<ArenaTree<Link> as crate::TreeIterable<Link>>::NodeRef],
     ) -> Vec<Self::Transformation> {
         tree.iter(DepthFirst, &[])
-            .accumulate(params.as_slice().unwrap(), self.max_depth)
+            .accumulate_transformations(params.as_slice().unwrap(), self.max_depth)
             .filter_map(|(node, trafo)| {
-                if target_refs.contains(&tree.get_ref(node)) {
+                if target_refs.len() == 0 {
+                    Some(trafo)
+                } else if target_refs.contains(&tree.get_ref(node)) {
                     Some(trafo)
                 } else {
                     None
@@ -108,19 +113,15 @@ impl Forward<ArenaTree<Link>, Link> for SimpleFK {
     }
 }
 
-pub struct DifferentialIK {}
+pub struct DifferentialIK {
+    max_depth: usize,
+}
 
-pub type DifferentialIKParameter = <DifferentialIK as Inverse<ArenaTree<Link>, Link, SimpleFK>>::Parameter;
-pub type DifferentialIKArray = <DifferentialIK as Inverse<ArenaTree<Link>, Link, SimpleFK>>::Array;
+pub type DifferentialIKParameter = <DifferentialIK as Inverse<ArenaTree<Link>, Link, FK>>::Parameter;
+pub type DifferentialIKArray = <DifferentialIK as Inverse<ArenaTree<Link>, Link, FK>>::Array;
 
 impl DifferentialIK {
-    pub fn jacobian(&self, tree: &ArenaTree<Link>, param: DifferentialIKParameter) -> DifferentialIKArray {
-        let ndof = 3;
-        let ntcp = 2;
-        let max = 42;
-        // Assumption: row-based
-        let mut jacobian = Array2::<f64>::zeros((ndof, ntcp));
-
+    pub fn jacobian(&self, tree: &ArenaTree<Link>, params: DifferentialIKParameter) -> DifferentialIKArray {
         // jacobian
         //     .axis_iter_mut(Axis(0))
         //     .into_par_iter()
@@ -137,24 +138,55 @@ impl DifferentialIK {
         //         //     });
         //     });
 
-        {
-            jacobian
-                .axis_iter_mut(Axis(0))
-                .into_par_iter()
-                .zip(
-                    tree.iter(DepthFirst, &[])
-                        .accumulate(param.as_slice().expect("Cannot convert parameters to slice!"), 42)
-                        //.into_par_iter() // not implemented yet
-                        .collect_vec()
-                        .into_par_iter(),
-                )
-                .for_each(|(row, (node, trafo))| println!("{row}, {node}, {trafo}"));
-        }
+        // Added annotation for IDE
+        let nodes_trafos = tree
+            .iter(DepthFirst, &[])
+            .accumulate_transformations(params.as_slice().unwrap(), self.max_depth)
+            .enumerate()
+            .collect_vec();
+
+        let n_dof = nodes_trafos.len(); // number of degrees of freedom
+        let n_tcp = nodes_trafos.len(); // number of tool center points
+
+        // Trick we reduce a 3D (n x m x o) array to a two dimensional one (x*m,o) after iteration
+        let mut jacobian = Array3::<f64>::zeros((n_dof, 3, n_tcp));
+
+        // Warning filtering could be interesting! Cannot do it after `into_par_iter`
+
         jacobian
+            .axis_iter_mut(Axis(0))
+            // .into_par_iter()
+            .zip(
+                nodes_trafos.iter(), // .par_iter()
+            )
+            .for_each(|(mut dof, (idx, (node, trafo)))| {
+                // dof: (3,n_tcp)
+                println!("row: {dof}, idx: {idx}, depth: {}", node.depth());
+                let x = nodes_trafos
+                    .iter()
+                    .skip(*idx + 1)
+                    .map(|(idx, (node, _))| (idx, node.depth()))
+                    .collect_vec();
+                println!("{x:?}");
+                nodes_trafos
+                    .iter()
+                    .skip(*idx + 1)
+                    .take_while(|(_, (child, _))| child.depth() > node.depth())
+                    .for_each(|(idx, (child, child_trafo))| {
+                        let local = Link::concat(&Link::invert(trafo), child_trafo);
+                        let pos = local.slice(s![..3, 3]);
+
+                        dof.slice_mut(s![..3, *idx]).assign(&pos);
+
+                        println!("column:{}, {}, {dof}", idx + 1, child.depth())
+                    })
+            });
+        // is this slower?
+        jacobian.into_shape_with_order((n_dof * 3, n_tcp)).unwrap()
     }
 }
 
-impl Inverse<ArenaTree<Link>, Link, SimpleFK> for DifferentialIK {
+impl Inverse<ArenaTree<Link>, Link, FK> for DifferentialIK {
     type Parameter = Array1<f64>;
 
     type Array = Array2<f64>;
@@ -162,7 +194,7 @@ impl Inverse<ArenaTree<Link>, Link, SimpleFK> for DifferentialIK {
     fn solve(
         &mut self,
         tree: &ArenaTree<Link>,
-        fk: &SimpleFK,
+        fk: &FK,
         param: Self::Parameter,
         target_refs: &[<ArenaTree<Link> as crate::TreeIterable<Link>>::NodeRef],
         target_val: &[Self::Array],
@@ -171,19 +203,20 @@ impl Inverse<ArenaTree<Link>, Link, SimpleFK> for DifferentialIK {
     }
 }
 
-pub type Robot = Mannequin<ArenaTree<Link>, Link, SimpleFK, DifferentialIK>;
+pub type Robot = Mannequin<ArenaTree<Link>, Link, FK, DifferentialIK>;
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use ndarray::prelude::*;
 
     use crate::{ArenaTree, Forward, Order::DepthFirst, Rigid, TreeIterable};
 
-    use super::{Link, SimpleFK};
+    use super::{DifferentialIK, Link, FK};
 
     #[test]
     fn test_fk() {
-        let mut fk = SimpleFK { max_depth: 10 };
+        let mut fk = FK { max_depth: 10 };
         let mut tree = ArenaTree::<Link>::new();
 
         let mut trafo = Link::neutral_element();
@@ -192,22 +225,54 @@ mod tests {
         let link1 = Link::new(&trafo);
         let link2 = Link::new(&trafo);
         let link3 = Link::new(&trafo);
+        let link4 = Link::new(&trafo);
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
         let ref1 = tree.add(link1, None).unwrap();
         let ref2 = tree.add(link2, Some(ref1)).unwrap();
         let ref3 = tree.add(link3, Some(ref1)).unwrap();
-
-        let node1 = tree.get_node_by_ref(&ref1).unwrap();
-        let node2 = tree.get_node_by_ref(&ref2).unwrap();
-        let node3 = tree.get_node_by_ref(&ref2).unwrap();
+        let ref4 = tree.add(link4, Some(ref3)).unwrap();
 
         tree.optimize(DepthFirst);
 
-        let res = fk.solve(&tree, array![0.0, 0.0, std::f64::consts::FRAC_PI_2], &[ref2, ref3]);
-        println!("{:?}", res)
+        let res = fk.solve(
+            &tree,
+            array![0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0],
+            &[ref2, ref3, ref4],
+        );
+        let res = res.iter().map(|el| el.slice(s![..3, 3]).to_vec()).collect_vec();
+        println!("{:?}", res);
+        assert_eq!(
+            res,
+            vec![vec![20.0, 0.0, 0.0], vec![20.0, 0.0, 0.0], vec![20.0, 10.0, 0.0]]
+        );
     }
+
     #[test]
-    fn test_ik() {}
+    fn test_jacobian() {
+        let mut ik = DifferentialIK { max_depth: 10 };
+        let mut tree = ArenaTree::<Link>::new();
+
+        let mut trafo = Link::neutral_element();
+        trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
+
+        let link1 = Link::new(&trafo);
+        let link2 = Link::new(&trafo);
+        let link3 = Link::new(&trafo);
+        let link4 = Link::new(&trafo);
+
+        // TODO .. can we make the refs fix in a way they don't get optimized away?
+        // Then these could be strings even!
+        let ref1 = tree.add(link1, None).unwrap();
+        let ref3 = tree.add(link3, Some(ref1)).unwrap();
+        let ref4 = tree.add(link4, Some(ref3)).unwrap();
+        let ref2 = tree.add(link2, Some(ref1)).unwrap();
+
+        tree.optimize(DepthFirst);
+
+        let jacobian = ik.jacobian(&tree, array![0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
+
+        println!("jacobian: {jacobian:?}");
+    }
 }
