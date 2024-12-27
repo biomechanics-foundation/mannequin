@@ -14,6 +14,8 @@ pub trait Rigid: PartialEq {
     /// typically joint positions (angles/extension), f64, \[f64,3\]
     type Parameter;
 
+    type NodeId: PartialEq + Clone;
+
     /// Get the Transformation from the parent taking the connecting joint into account
     fn transformation(&self, param: &Self::Parameter) -> Self::Transformation;
 
@@ -40,20 +42,20 @@ pub trait Rigid: PartialEq {
 }
 
 /// Helper function to be used in [std::iter::Scan] for accumulating transformations from direct path from a root to a node
-pub fn accumulate<'a, S, T>(
-    stack: &mut Vec<T::Transformation>,
-    arg: (&'a S, &T::Parameter),
-) -> Option<(&'a S, T::Transformation)>
+pub fn accumulate<'a, Node, Load, NodeRef>(
+    stack: &mut Vec<Load::Transformation>,
+    arg: (&'a Node, &Load::Parameter),
+) -> Option<(&'a Node, Load::Transformation)>
 where
-    S: Nodelike<T>,
-    T: Rigid,
+    Node: Nodelike<Load, NodeRef>,
+    Load: Rigid,
 {
     let (node, param) = arg;
     while node.depth() < stack.len() {
         stack.pop();
     }
-    let current = T::concat(
-        stack.last().unwrap_or(&T::neutral_element()),
+    let current = Load::concat(
+        stack.last().unwrap_or(&Load::neutral_element()),
         &node.get().transformation(param),
     );
     stack.push(current.clone());
@@ -63,31 +65,32 @@ where
 ///  Trait that adds an `accumulate` functions for accumulating transformations from direct path from a root to a node.
 /// Wraps a zip and scan operation
 ///
-pub trait TransformationAccumulation<'a, N, T>
+pub trait TransformationAccumulation<'a, Node, Load, NodeRef>
 where
-    T: Rigid,
-    N: Nodelike<T> + 'a,
+    Load: Rigid,
+    Node: Nodelike<Load, NodeRef> + 'a,
 {
     fn accumulate_transformations(
         self,
-        param: &[T::Parameter],
+        param: &[Load::Parameter],
         max_depth: usize,
-    ) -> impl Iterator<Item = (&'a N, T::Transformation)>;
+    ) -> impl Iterator<Item = (&'a Node, Load::Transformation)>;
 }
 
-impl<'a, 'b, S, T> TransformationAccumulation<'a, S, T> for Box<dyn Iterator<Item = &'a S> + 'b>
+impl<'a, 'b, Node, Load, NodeRef> TransformationAccumulation<'a, Node, Load, NodeRef>
+    for Box<dyn Iterator<Item = &'a Node> + 'b>
 where
-    S: Nodelike<T>,
-    T: Rigid,
+    Node: Nodelike<Load, NodeRef>,
+    Load: Rigid,
 {
     fn accumulate_transformations(
         self,
-        param: &[T::Parameter],
+        param: &[Load::Parameter],
         max_depth: usize,
-    ) -> impl Iterator<Item = (&'a S, <T as Rigid>::Transformation)> {
+    ) -> impl Iterator<Item = (&'a Node, <Load as Rigid>::Transformation)> {
         self.into_iter()
             .zip(param.iter())
-            .scan(Vec::<T::Transformation>::with_capacity(max_depth), accumulate)
+            .scan(Vec::<Load::Transformation>::with_capacity(max_depth), accumulate)
     }
 }
 

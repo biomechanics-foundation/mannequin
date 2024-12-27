@@ -1,42 +1,47 @@
 /*! Implementation of a tree iteration with [arena allocation](https://en.wikipedia.org/wiki/Region-based_memory_management) */
 use super::arena_tree::{ArenaNode, ArenaTree};
-
-use crate::{Nodelike, TreeIterable};
+use crate::Nodelike;
 use core::fmt;
 
 /// Iterator for a depth-first iteration when the data is not already sorted accordingly
-pub struct DepthFirstIterator<'a, 'b, T>
+pub struct DepthFirstIterator<'a, 'b, T, N>
 where
     'a: 'b,
     T: 'static + fmt::Debug + PartialEq,
 {
-    tree: &'a ArenaTree<T>,
-    stack: Vec<std::slice::Iter<'b, <ArenaTree<T> as TreeIterable<T>>::NodeRef>>,
-    // root: &'b Vec<<ArenaTree<T> as IterableTree>::NodeRef>,
-    // root2: Vec<<ArenaTree<T> as IterableTree>::NodeRef>,
-    // stack2: Vec<std::slice::Iter<'b, <ArenaTree<T> as IterableTree>::NodeRef>>,
+    tree: &'a ArenaTree<T, N>,
+    stack: Vec<std::slice::Iter<'b, usize>>,
+    root: Option<usize>,
 }
 
-impl<'a, 'b, T> DepthFirstIterator<'a, 'b, T>
+impl<'a, 'b, T, N> DepthFirstIterator<'a, 'b, T, N>
 where
     T: 'static + fmt::Debug + PartialEq,
 {
     // TODO did not manage to over write the root nodes :(
-    pub fn new(tree: &'a ArenaTree<T>, root: &'b [<ArenaTree<T> as TreeIterable<T>>::NodeRef]) -> Self {
+    pub fn new(tree: &'a ArenaTree<T, N>, root: usize) -> Self {
         let mut stack = Vec::with_capacity(tree.max_depth);
-        stack.push(root.iter());
         println!("Creating new depth-first iterator (slow)");
-        DepthFirstIterator { tree, stack }
+        DepthFirstIterator {
+            tree,
+            stack,
+            root: Some(root),
+        }
     }
 }
-impl<'a, 'b, T> Iterator for DepthFirstIterator<'a, 'b, T>
+impl<'a, 'b, T, N> Iterator for DepthFirstIterator<'a, 'b, T, N>
 where
     T: fmt::Debug + PartialEq,
 {
-    type Item = &'a ArenaNode<T>;
+    type Item = &'a ArenaNode<T, N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(last) = self.stack.last_mut() {
+        if let Some(root) = self.root {
+            let root = &self.tree.nodes[root];
+            self.stack.push(root.children.iter());
+            self.root = None;
+            Some(root)
+        } else if let Some(last) = self.stack.last_mut() {
             if let Some(child_ref) = last.next() {
                 let node = &self.tree.nodes[*child_ref];
                 self.stack.push(node.children.iter());
@@ -53,17 +58,17 @@ where
 
 /// Iterator for a breadth-first iteration when the data is not already sorted accordingly
 
-pub struct BreadthFirstIterator<'a, T> {
-    tree: &'a ArenaTree<T>,
+pub struct BreadthFirstIterator<'a, T, NodeRef> {
+    tree: &'a ArenaTree<T, NodeRef>,
 }
 
-impl<'a, T> BreadthFirstIterator<'a, T> {
-    pub fn new(tree: &'a ArenaTree<T>) -> Self {
+impl<'a, T, NodeRef> BreadthFirstIterator<'a, T, NodeRef> {
+    pub fn new(tree: &'a ArenaTree<T, NodeRef>) -> Self {
         BreadthFirstIterator { tree }
     }
 }
-impl<'a, T> Iterator for BreadthFirstIterator<'a, T> {
-    type Item = &'a ArenaNode<T>;
+impl<'a, T, NodeRef> Iterator for BreadthFirstIterator<'a, T, NodeRef> {
+    type Item = &'a ArenaNode<T, NodeRef>;
 
     fn next(&mut self) -> Option<Self::Item> {
         todo!()
@@ -71,9 +76,9 @@ impl<'a, T> Iterator for BreadthFirstIterator<'a, T> {
 }
 
 /// Accumulation over a *Depth First* iteration (this is not checked).
-pub trait DepthFirstAccumulation<'a, Node, T, F, Parameter, Accumulated>
+pub trait DepthFirstAccumulation<'a, Node, Load, F, Parameter, Accumulated, NodeRef>
 where
-    Node: Nodelike<T> + 'a,
+    Node: Nodelike<Load, NodeRef> + 'a,
     F: Fn(&Node, &Parameter, &Accumulated) -> Accumulated + 'static,
     Accumulated: Clone,
 {
@@ -92,25 +97,36 @@ where
     ) -> impl Iterator<Item = (&'a Node, Accumulated)>;
 }
 
-impl<'a, 'b, N, T, F, P, R> DepthFirstAccumulation<'a, N, T, F, P, R> for Box<dyn Iterator<Item = &'a N> + 'b>
+impl<'a, 'b, Node, Load, F, Parameter, Accumulated, NodeRef>
+    DepthFirstAccumulation<'a, Node, Load, F, Parameter, Accumulated, NodeRef>
+    for Box<dyn Iterator<Item = &'a Node> + 'b>
 where
-    N: Nodelike<T> + 'a,
-    F: Fn(&N, &P, &R) -> R + 'static,
-    R: Clone,
+    Node: Nodelike<Load, NodeRef> + 'a,
+    F: Fn(&Node, &Parameter, &Accumulated) -> Accumulated + 'static,
+    Accumulated: Clone,
 {
-    fn accumulate(self, param: &[P], acc: F, first: R, max_depth: usize) -> impl Iterator<Item = (&'a N, R)> {
+    fn accumulate(
+        self,
+        param: &[Parameter],
+        acc: F,
+        first: Accumulated,
+        max_depth: usize,
+    ) -> impl Iterator<Item = (&'a Node, Accumulated)> {
         self.into_iter()
             .zip(param.iter())
             // TODO look up whether the move here (required for the acc parameter) slows down execution
             // TODO this function should replace the accumulation in `rigid.rs`
-            .scan(Vec::<R>::with_capacity(max_depth), move |stack, (node, param)| {
-                let depth = stack.len();
-                while node.depth() < depth {
-                    stack.pop();
-                }
-                let result = acc(node, param, stack.last().unwrap_or(&first));
-                stack.push(result.clone());
-                Some((node, result))
-            })
+            .scan(
+                Vec::<Accumulated>::with_capacity(max_depth),
+                move |stack, (node, param)| {
+                    let depth = stack.len();
+                    while node.depth() < depth {
+                        stack.pop();
+                    }
+                    let result = acc(node, param, stack.last().unwrap_or(&first));
+                    stack.push(result.clone());
+                    Some((node, result))
+                },
+            )
     }
 }

@@ -10,6 +10,7 @@ use itertools::Itertools;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 use ndarray::{Array1, Array2, Array4};
+use std::marker::PhantomData;
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Link {
@@ -36,6 +37,8 @@ impl Rigid for Link {
     type Point = Array1<f64>;
 
     type Parameter = f64;
+
+    type NodeId = String;
 
     fn transformation(&self, param: &Self::Parameter) -> Self::Transformation {
         Self::concat(
@@ -83,27 +86,27 @@ impl Rigid for Link {
     }
 }
 
+type LinkNodeId = <Link as Rigid>::NodeId;
+
 /// Specialization of a Forward Kinematics on an [ArenaTree]
-pub struct FK {
+pub struct ForwardsKinematics {
     max_depth: usize,
 }
-impl Forward<ArenaTree<Link>, Link> for FK {
+impl Forward<ArenaTree<Link, LinkNodeId>, Link> for ForwardsKinematics {
     type Parameter = Array1<f64>;
 
     type Transformation = Array2<f64>;
 
     fn solve(
         &mut self,
-        tree: &ArenaTree<Link>,
+        tree: &ArenaTree<Link, LinkNodeId>,
         params: Self::Parameter,
-        target_refs: &[<ArenaTree<Link> as crate::TreeIterable<Link>>::NodeRef],
+        target_refs: &[LinkNodeId],
     ) -> Vec<Self::Transformation> {
-        tree.iter(DepthFirst, &[])
+        tree.iter(DepthFirst, None)
             .accumulate_transformations(params.as_slice().unwrap(), self.max_depth)
             .filter_map(|(node, trafo)| {
-                if target_refs.len() == 0 {
-                    Some(trafo)
-                } else if target_refs.contains(&tree.get_ref(node)) {
+                if target_refs.is_empty() || target_refs.contains(&node.id()) {
                     Some(trafo)
                 } else {
                     None
@@ -117,11 +120,13 @@ pub struct DifferentialIK {
     max_depth: usize,
 }
 
-pub type DifferentialIKParameter = <DifferentialIK as Inverse<ArenaTree<Link>, Link, FK>>::Parameter;
-pub type DifferentialIKArray = <DifferentialIK as Inverse<ArenaTree<Link>, Link, FK>>::Array;
+pub type DifferentialIKParameter =
+    <DifferentialIK as Inverse<ArenaTree<Link, LinkNodeId>, Link, ForwardsKinematics>>::Parameter;
+pub type DifferentialIKArray =
+    <DifferentialIK as Inverse<ArenaTree<Link, LinkNodeId>, Link, ForwardsKinematics>>::Array;
 
 impl DifferentialIK {
-    pub fn jacobian(&self, tree: &ArenaTree<Link>, params: DifferentialIKParameter) -> DifferentialIKArray {
+    pub fn jacobian(&self, tree: &ArenaTree<Link, LinkNodeId>, params: DifferentialIKParameter) -> DifferentialIKArray {
         // jacobian
         //     .axis_iter_mut(Axis(0))
         //     .into_par_iter()
@@ -140,7 +145,7 @@ impl DifferentialIK {
 
         // Added annotation for IDE
         let nodes_trafos = tree
-            .iter(DepthFirst, &[])
+            .iter(DepthFirst, None)
             .accumulate_transformations(params.as_slice().unwrap(), self.max_depth)
             .enumerate()
             .collect_vec();
@@ -186,38 +191,38 @@ impl DifferentialIK {
     }
 }
 
-impl Inverse<ArenaTree<Link>, Link, FK> for DifferentialIK {
+impl Inverse<ArenaTree<Link, LinkNodeId>, Link, ForwardsKinematics> for DifferentialIK {
     type Parameter = Array1<f64>;
 
     type Array = Array2<f64>;
 
     fn solve(
         &mut self,
-        tree: &ArenaTree<Link>,
-        fk: &FK,
+        tree: &ArenaTree<Link, LinkNodeId>,
+        fk: &ForwardsKinematics,
         param: Self::Parameter,
-        target_refs: &[<ArenaTree<Link> as crate::TreeIterable<Link>>::NodeRef],
+        target_refs: &[LinkNodeId],
         target_val: &[Self::Array],
     ) -> Self::Parameter {
         todo!()
     }
 }
 
-pub type Robot = Mannequin<ArenaTree<Link>, Link, FK, DifferentialIK>;
+pub type Robot = Mannequin<ArenaTree<Link, LinkNodeId>, Link, ForwardsKinematics, DifferentialIK>;
 
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
     use ndarray::prelude::*;
 
-    use crate::{ArenaTree, Forward, Order::DepthFirst, Rigid, TreeIterable};
+    use crate::{ndarray::robot::LinkNodeId, ArenaTree, Forward, Order::DepthFirst, Rigid, TreeIterable};
 
-    use super::{DifferentialIK, Link, FK};
+    use super::{DifferentialIK, ForwardsKinematics, Link};
 
     #[test]
     fn test_fk() {
-        let mut fk = FK { max_depth: 10 };
-        let mut tree = ArenaTree::<Link>::new();
+        let mut fk = ForwardsKinematics { max_depth: 10 };
+        let mut tree = ArenaTree::<Link, LinkNodeId>::new();
 
         let mut trafo = Link::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
@@ -229,10 +234,10 @@ mod tests {
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
-        let ref1 = tree.add(link1, None).unwrap();
-        let ref2 = tree.add(link2, Some(ref1)).unwrap();
-        let ref3 = tree.add(link3, Some(ref1)).unwrap();
-        let ref4 = tree.add(link4, Some(ref3)).unwrap();
+        let ref1 = tree.set_root(link1, "link1".to_string());
+        let ref2 = tree.add(link2, "link2".to_string(), &ref1).unwrap();
+        let ref3 = tree.add(link3, "link3".to_string(), &ref1).unwrap();
+        let ref4 = tree.add(link4, "link4".to_string(), &ref3).unwrap();
 
         tree.optimize(DepthFirst);
 
@@ -252,7 +257,7 @@ mod tests {
     #[test]
     fn test_jacobian() {
         let mut ik = DifferentialIK { max_depth: 10 };
-        let mut tree = ArenaTree::<Link>::new();
+        let mut tree = ArenaTree::<Link, LinkNodeId>::new();
 
         let mut trafo = Link::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
@@ -264,10 +269,11 @@ mod tests {
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
-        let ref1 = tree.add(link1, None).unwrap();
-        let ref3 = tree.add(link3, Some(ref1)).unwrap();
-        let ref4 = tree.add(link4, Some(ref3)).unwrap();
-        let ref2 = tree.add(link2, Some(ref1)).unwrap();
+
+        let ref1 = tree.set_root(link1, "link1".to_string());
+        let ref2 = tree.add(link2, "link2".to_string(), &ref1).unwrap();
+        let ref3 = tree.add(link3, "link3".to_string(), &ref1).unwrap();
+        let ref4 = tree.add(link4, "link4".to_string(), &ref3).unwrap();
 
         tree.optimize(DepthFirst);
 

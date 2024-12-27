@@ -20,6 +20,8 @@ impl Rigid for DummyBody {
 
     type Parameter = f64;
 
+    type NodeId = i32;
+
     fn transformation(&self, param: &Self::Parameter) -> Self::Transformation {
         self.value * param
     }

@@ -2,9 +2,15 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum MannequinError {
+pub enum MannequinError<NodeID> {
     #[error("Node reference {0} is out of bound")]
     ReferenceOutOfBound(usize),
+    #[error("Node not in tree: {0}")]
+    UnkonwnNode(NodeID),
+    #[error("No root node set")]
+    RootNotSet,
+    #[error("ID not unique: {0}")]
+    NotUnique(NodeID),
 }
 
 /// Order of iteration
@@ -16,10 +22,11 @@ pub enum Order {
 }
 
 /// Container that holds data in a `TreeIterable`
-pub trait Nodelike<T> {
+pub trait Nodelike<Load, NodeId> {
     fn is_leaf(&self) -> bool;
-    fn get(&self) -> &T;
+    fn get(&self) -> &Load;
 
+    fn id(&self) -> NodeId;
     /// Get the node's distance to its root node. Required for computing accumulations.
     fn depth(&self) -> usize;
 
@@ -29,31 +36,33 @@ pub trait Nodelike<T> {
 }
 
 /// A datastructure to hold a tree hierarchy of data contained in `NodeLike`s.
-pub trait TreeIterable<T: PartialEq> {
-    type Node: 'static + Nodelike<T>; // cannot hold references
-    type NodeRef;
+///
+/// TODO Put an emphasis on that mutability is tough. after the tree has been constructed
+/// it is advised to not access it in a mutable way (because of borrowed node references)
+pub trait TreeIterable<Load, NodeId>
+where
+    Load: PartialEq,
+    NodeId: std::cmp::PartialEq + Clone,
+{
+    type Node: 'static + Nodelike<Load, NodeId>; // cannot hold references
 
-    fn iter<'a, 'b, 'c>(&'a self, traversal: Order, roots: &'b [Self::NodeRef]) -> impl Iterator<Item = &'a Self::Node>
+    fn iter<'a, 'b>(&'a self, traversal: Order, root: Option<&Self::Node>) -> impl Iterator<Item = &'a Self::Node>
     where
-        'a: 'c,
-        'b: 'c;
+        'a: 'b;
 
     /// Add a new node to the tree. A tree can have multiple root nodes; their parents are `None`
-    fn add(&mut self, load: T, parent: Option<Self::NodeRef>) -> Result<Self::NodeRef, MannequinError>;
+    fn add(&mut self, load: Load, node_ref: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>>;
+
+    /// Deletes all nodes and sets a new root
+    fn set_root(&mut self, root_load: Load, root_ref: NodeId) -> NodeId;
 
     /// Optimizes the tree for a traversal order after all nodes have been added. May also
     /// generate caches if applicable.
     /// **Warning** breaks all existing references in your program!
     fn optimize(&mut self, for_traversal: Order);
 
-    fn get_ref(&self, node: &Self::Node) -> Self::NodeRef;
-    fn get_ref_by_load(&self, load: &T) -> Option<Self::NodeRef>;
-    fn get_node_by_ref(&self, node_ref: &Self::NodeRef) -> Option<&Self::Node>;
-
-    // TODO implement these members
-    // fn iter_mut(&self, traversal: Order, root: Option<Self::NodeRef>) -> Self::Iterator;
-    // fn pop(&mut self, node_ref: Self::NodeRef) -> Self::Node;
-    // fn node(&self, node_ref: Self::NodeRef) -> &Self::Node;
-    // fn children(&self, node_ref: Self::NodeRef) -> &[self:NodeRef];
-    // fn reorder(self, order: Order) -> Self;
+    fn root(&self) -> Result<&Self::Node, MannequinError<NodeId>>;
+    fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>>;
+    fn node_by_load(&self, load: &Load) -> Option<&Self::Node>;
+    fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node>;
 }

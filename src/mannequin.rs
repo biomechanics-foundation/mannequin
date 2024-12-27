@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 /// (e.g., a robot) or softbody/skinning for character animation.
 pub trait Forward<IT, RB>
 where
-    IT: TreeIterable<RB>,
+    IT: TreeIterable<RB, RB::NodeId>,
     RB: Rigid,
 {
     // TODO maybe change to slice
@@ -19,14 +19,15 @@ where
     type Transformation;
 
     // TODO this can have a default implementation
-    fn solve(&mut self, tree: &IT, params: Self::Parameter, target_refs: &[IT::NodeRef]) -> Vec<Self::Transformation>;
+    fn solve(&mut self, tree: &IT, params: Self::Parameter, target_refs: &[RB::NodeId]) -> Vec<Self::Transformation>;
 }
 
 /// Trait representing a stateful inverse kinematics algoritm.
 pub trait Inverse<IT, RB, FK>
 where
     // Avoid mixing of backends
-    IT: TreeIterable<RB>,
+    IT: TreeIterable<RB, RB::NodeId>,
+
     RB: Rigid,
     FK: Forward<IT, RB, Transformation = Self::Array>,
 {
@@ -38,7 +39,7 @@ where
         tree: &IT,
         fk: &FK,
         param: Self::Parameter,
-        target_refs: &[IT::NodeRef],
+        target_refs: &[RB::NodeId],
         target_val: &[Self::Array],
     ) -> Self::Parameter;
 }
@@ -52,7 +53,8 @@ where
 pub struct Mannequin<IT, RB, FK, IK>
 where
     RB: Rigid,
-    IT: TreeIterable<RB>,
+    IT: TreeIterable<RB, RB::NodeId>,
+
     FK: Forward<IT, RB>,
     IK: Inverse<IT, RB, FK, Array = FK::Transformation>,
 {
@@ -65,7 +67,7 @@ where
 impl<IT, RB, FK, IK> Mannequin<IT, RB, FK, IK>
 where
     RB: Rigid,
-    IT: TreeIterable<RB>,
+    IT: TreeIterable<RB, RB::NodeId>,
     FK: Forward<IT, RB>,
     IK: Inverse<IT, RB, FK, Array = FK::Transformation>,
 {
@@ -79,7 +81,7 @@ where
     }
 
     /// Forward kinematics for the targets in `target_refs` and the joint positions in `param`.
-    pub fn forward(&mut self, param: FK::Parameter, target_refs: &[IT::NodeRef]) -> Vec<FK::Transformation> {
+    pub fn forward(&mut self, param: FK::Parameter, target_refs: &[RB::NodeId]) -> Vec<FK::Transformation> {
         self.fk.solve(&self.tree, param, target_refs)
     }
 
@@ -87,7 +89,7 @@ where
     pub fn inverse(
         &mut self,
         param: IK::Parameter,
-        target_refs: &[IT::NodeRef],
+        target_refs: &[RB::NodeId],
         target_val: &[IK::Array],
     ) -> IK::Parameter {
         self.ik.solve(&self.tree, &self.fk, param, target_refs, target_val)
