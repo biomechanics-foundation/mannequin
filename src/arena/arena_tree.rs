@@ -204,7 +204,6 @@ where
         // println!("Adding {:?} to parent {:?}", load, parent);
 
         let index = self.nodes.len();
-        let depth: usize;
 
         let parent_index = parent.index;
         let mut parent = self
@@ -216,7 +215,7 @@ where
         // * Add the node to the root list if it does not have a parent
 
         parent.children.push(index);
-        depth = parent.depth + 1;
+        let depth = parent.depth + 1;
         parent.width += 1;
 
         // update parent's parents
@@ -228,7 +227,7 @@ where
             parent.width += 1;
         }
 
-        if self.nodes.iter().find(|n| n.id() == node_ref).is_none() {
+        if self.nodes.iter().any(|n| n.id() == node_ref) {
             return Err(MannequinError::NotUnique(node_ref));
         }
         // Finally, add the node
@@ -236,7 +235,7 @@ where
             load,
             node_ref,
             index,
-            0,
+            1,
             vec![],
             depth,
             Some(parent_index),
@@ -298,11 +297,12 @@ where
 
     fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>> {
         let id = node.id();
-        let index = self.node_by_id(&id).ok_or(MannequinError::UnkonwnNode(id))?.index;
+        // can we rely on this check?
+        self.node_by_id(&id).ok_or(MannequinError::UnkonwnNode(id))?;
         Ok(self
             .nodes
             .iter()
-            .filter(|n| node.children.iter().contains(&index))
+            .filter(|n| node.children.iter().contains(&n.index))
             .collect_vec())
     }
 }
@@ -317,6 +317,12 @@ mod tests {
 
     #[test_log::test]
     fn test_adding_iteration() {
+        // Loadas are integers chosen such that after optimization, they are sorted in increasing order
+        // IDs are string representations of integers that reflect the order of  insertion
+        // Before optimization, the nodes are stored according to the IDs, iteration is ordered by load
+        // because of the chosen tree layout. After optimization, the nodes are sorted by load.
+
+        // Layout of the tree (such that optimization will enforce reordering)
         //     0
         //    / \
         //  1    5
@@ -330,48 +336,79 @@ mod tests {
         let root = tree.set_root(0, "root".to_string());
 
         let first = tree.add(1, "first".to_string(), &root).unwrap();
-        // Add the second root first to see whether resorting of the vector works
         let second = tree.add(5, "second".to_string(), &root).unwrap();
-
         let third = tree.add(2, "third".to_string(), &first).unwrap();
 
         tree.add(4, "fourth".to_string(), &first).unwrap();
         tree.add(3, "fifth".to_string(), &third).unwrap();
         tree.add(6, "sixth".to_string(), &second).unwrap();
 
-        // This uses the depth first iterator!
+        // Check storage unoptimized for depth-first decent
+        assert_eq!(tree.nodes.iter().map(|n| n.load).collect_vec(), &[0, 1, 5, 2, 4, 3, 6]);
+        assert_eq!(
+            tree.nodes.iter().map(|n| &n.id).collect_vec(),
+            &["root", "first", "second", "third", "fourth", "fifth", "sixth"]
+        );
+
+        // This uses the depth slow first iterator!
         let result = tree.iter(DepthFirst, None).map(|i| *i.get()).collect_vec();
-        assert_eq!(result, &[1, 2, 3, 4, 5, 6]);
+        assert_eq!(result, &[0, 1, 2, 3, 4, 5, 6]);
+        let result = tree.iter(DepthFirst, None).map(|i| &i.id).collect_vec();
+
+        // Check whether iteration is not in the same order as insertion and matches the expectation
+        assert_eq!(
+            result,
+            &["root", "first", "third", "fifth", "fourth", "second", "sixth"]
+        );
+
+        // Check correctness of child references for two nodes
+        assert_eq!(tree.nodes[0].children, &[1, 2]);
+        assert_eq!(tree.nodes[1].children, &[3, 4]);
+        assert_eq!(tree.nodes[2].children, &[6]);
+        assert_eq!(tree.nodes[3].children, &[5]);
+
+        // // Example of how to print the hierachy
+        // tree.nodes
+        // .iter()
+        // .enumerate()
+        // .for_each(|(i, n)| println!("{i}.: id: {}, load: {}, children {:?}", n.id, n.load, n.children));
 
         // Optimize the tree such that the nodes are sorted in depth-frist manner
-        // assert_eq!(tree.nodes[1].children, &[2, 3]);
-        // assert_eq!(tree.root().unwrap().node_ref_, root.node_ref_);
-
         tree.optimize(DepthFirst);
-        assert_eq!(tree.nodes[1].children, &[1, 3]);
-        assert_eq!(tree.nodes[0].children, &[0, 4]);
+
+        // Check correctness of child references for two nodes
+        assert_eq!(tree.nodes[0].children, &[1, 5]);
+        assert_eq!(tree.nodes[1].children, &[2, 4]);
+        assert_eq!(tree.nodes[2].children, &[3]);
+        assert_eq!(tree.nodes[5].children, &[6]);
 
         // check correctness of storage
-        assert_eq!(tree.nodes.iter().map(|n| n.load).collect_vec(), &[1, 2, 3, 4, 5, 6]);
-        assert_eq!(tree.nodes.iter().map(|n| n.index).collect_vec(), &[0, 1, 2, 3, 4, 5]);
+        assert_eq!(tree.nodes.iter().map(|n| n.load).collect_vec(), &[0, 1, 2, 3, 4, 5, 6]);
 
-        println!("{:?}", tree.nodes.iter().map(|n| n.width).collect_vec());
+        // Check whether indices are stored correctly
+        assert_eq!(tree.nodes.iter().map(|n| n.index).collect_vec(), &[0, 1, 2, 3, 4, 5, 6]);
+
+        assert_eq!(
+            tree.nodes.iter().map(|n| &n.id).collect_vec(),
+            &["root", "first", "third", "fifth", "fourth", "second", "sixth"]
+        );
+
+        // Check whether the widths are computed correctly
+        let result = tree.nodes.iter().map(|n| n.width).collect_vec();
+        assert_eq!(result, &[7, 4, 2, 1, 1, 2, 1]);
 
         // Now we can safely immutably borrow the node
-        let first = tree.node_by_id(&first).unwrap();
-        // Now check whether iterating over the sorted vec works
-        let result = tree
-            .iter(DepthFirst, Some(&first))
-            // .iter(DepthFirst, Some(tree.node_by_ref(&first).unwrap()))
-            .map(|i| *i.get())
-            .collect_vec();
-        // assert_eq!(result, &[1, 2, 3, 4]);
-        // let result = tree.iter(DepthFirst, Some(second)).map(|i| *i.get()).collect_vec();
-        // assert_eq!(result, &[5, 6]);
-        // let result = tree.iter(DepthFirst, None).map(|i| *i.get()).collect_vec();
-        // assert_eq!(result, &[1, 2, 3, 4, 5, 6]);
+        let first_node = tree.node_by_id(&first).unwrap();
 
-        // Check whether bread-first works (this will already use the cache as optimize has been called)
+        // Now check whether iterating over subtrees work
+        let result = tree.iter(DepthFirst, Some(first_node)).map(|i| *i.get()).collect_vec();
+        assert_eq!(result, &[1, 2, 3, 4]);
+        let second_node = tree.node_by_id(&second).unwrap();
+
+        let result = tree.iter(DepthFirst, Some(second_node)).map(|i| *i.get()).collect_vec();
+        assert_eq!(result, &[5, 6]);
+
+        // TODO Check whether bread-first works (this will already use the cache as optimize has been called)
     }
 
     // TODO add unit test for a `Box`ed node load
