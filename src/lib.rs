@@ -23,6 +23,7 @@
 //!             Callback methods have a `on_` prefix
 
 pub mod arena;
+pub mod differentiable;
 pub mod dummy;
 pub mod iterable_tree;
 pub mod mannequin;

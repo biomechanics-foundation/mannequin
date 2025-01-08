@@ -10,7 +10,6 @@ use itertools::Itertools;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 use ndarray::{Array1, Array2};
-use smallvec::SmallVec;
 
 #[derive(Debug, PartialEq)]
 
@@ -29,7 +28,6 @@ pub enum Axes {
 pub struct Bone {
     link: Array2<f64>,
     // TODO: I assume that having the axis at the same memory location is faster
-    axes: SmallVec<[Axes; 3]>,
 }
 
 impl Bone {
