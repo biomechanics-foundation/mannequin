@@ -1,7 +1,6 @@
 //! Implementation of traits as specializations for ArenaTree using ndarray
 #![allow(unused_variables)]
 
-use crate::rigid::Articulated;
 use crate::{
     accumulate, ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation,
     TreeIterable,
@@ -15,7 +14,7 @@ use smallvec::SmallVec;
 
 #[derive(Debug, PartialEq)]
 
-enum Axes {
+pub enum Axes {
     RotationX,
     RotationY,
     RotationZ,
@@ -24,36 +23,6 @@ enum Axes {
     TranslationY,
     TranslationZ,
     Translation(Array1<f64>),
-}
-
-impl Default for Axes {
-    fn default() -> Self {
-        Self::RotationZ
-    }
-}
-
-impl Articulated<Array2<f64>, f64> for Axes {
-    fn derive(&self, target: &Array2<f64>, param: &f64) -> Array2<f64> {
-        todo!()
-    }
-
-    fn transform(&self, parameter: &f64) -> Array2<f64> {
-        match self {
-            Axes::RotationX => todo!(),
-            Axes::RotationY => todo!(),
-            Axes::RotationZ => array![
-                [parameter.cos(), -1.0 * parameter.sin(), 0.0, 0.0],
-                [parameter.sin(), parameter.cos(), 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0]
-            ],
-            Axes::Rotation(array_base) => todo!(),
-            Axes::TranslationX => todo!(),
-            Axes::TranslationY => todo!(),
-            Axes::TranslationZ => todo!(),
-            Axes::Translation(array_base) => todo!(),
-        }
-    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -85,15 +54,16 @@ impl Rigid for Bone {
     type Point = Array1<f64>;
 
     type Parameter = f64;
-    type Parameters = Array1<f64>;
 
     type NodeId = String;
 
-    fn transform(&self, params: &Self::Parameters) -> Self::Transformation {
-        self.axes()
-            .iter()
-            .zip(params.iter())
-            .fold(self.link.clone(), |acc, (a, p)| Self::concat(&acc, &a.transform(p)))
+    fn transform(&self, param: &Self::Parameter) -> Self::Transformation {
+        array![
+            [param.cos(), -1.0 * param.sin(), 0.0, 0.0],
+            [param.sin(), param.cos(), 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0]
+        ]
     }
 
     fn globalize(&self, other: &Self::Point) -> Self::Point {
@@ -123,10 +93,6 @@ impl Rigid for Bone {
         let ipos = &trafo.slice(s![..3, 3]) * -1.0;
         result.slice_mut(s![..3, 3]).assign(&ipos);
         result
-    }
-
-    fn axes(&self) -> &[&dyn Articulated<Self::Transformation, Self::Parameter>] {
-        todo!()
     }
 }
 
@@ -333,7 +299,7 @@ mod tests {
 
     #[test]
     fn construct_jacobian_with_node_filter() {
-        fn ik<T>(tree: &T, params: &Array2<f64>, selected_joints: &HashSet<String>, selected_points: &HashSet<String>)
+        fn ik<T>(tree: &T, params: &Array1<f64>, selected_joints: &HashSet<String>, selected_points: &HashSet<String>)
         where
             T: TreeIterable<Bone, LinkNodeId>,
         {
@@ -347,13 +313,13 @@ mod tests {
                 .collect_vec();
 
             // TODO need to convert 2D to this. or accept an iterator over an array view in `accumulate_transformations` (better!)
-            let params = vec![array![1.0]; 42];
 
             // compute transformations only once
             let nodes_trafos = tree
                 .iter(DepthFirst, None)
-                .accumulate_transformations(&params, 42)
+                .accumulate_transformations(params.as_slice().unwrap(), 42)
                 .enumerate()
+                .map(|(idx, (node, trafo))| (idx, node, trafo)) // flatten
                 .collect_vec();
 
             let (m, n) = (selected_joints.len(), selected_points.len());
@@ -371,15 +337,23 @@ mod tests {
                     nodes_trafos
                         .iter()
                         .zip(active_joints.iter()) // Add the active joint lists
-                        .filter(|(_, active)| **active), // filter inactive joints
-                                                         // .par_iter()
+                        .filter_map(|(x, active)| if *active { Some(x) } else { None }), // filter inactive joints and remove flag
+                                                                                         // .par_iter()
                 )
-                .for_each(|(mut row, ((idx, (joint_node, joint_trafo)), _))| {
+                /* .Initially I wanted to iterate over the degrees of freedom, however each
+                axis should have its own `trafo` including the previous axis's tranformation
+                this makes it much more complex than anticipated.
+                Rather handle this internally. E.g. NodeID being a tuple data type of <string,usize> and implement hasfunction for this
+                map(|(idx, node, trafo)| ()),
+                That works! (surprisingly enough)
+                However, a 2D spline joint would be difficult to achieve (but doable with tuples of float as parameter type and a bit of duplication)
+                */
+                .for_each(|(mut row, (idx, joint_node, joint_trafo))| {
                     izip!(
                         tree.iter(DepthFirst, Some(joint_node)), // iterating over the child tree
                         // zipping the corresponding trafos (by skipping until the current node)
                         // Using the index here is ok, keeping an iterator is to hard (gets mutated in a different closure)
-                        nodes_trafos.iter().skip(*idx).map(|(_, (_, trafo))| trafo),
+                        nodes_trafos.iter().skip(*idx).map(|(_, _, trafo)| trafo),
                         row.axis_iter_mut(Axis(0)),
                         active_points.iter()
                     )
@@ -397,7 +371,14 @@ mod tests {
         let tree = ArenaTree::<Bone, LinkNodeId>::new();
 
         // TODO That's what I want to put in
-        let params = Array2::<f64>::ones((42, 1));
+        let params = Array1::<f64>::ones(42);
         ik(&tree, &params, &selected_joints, &selected_points);
+    }
+
+    #[test]
+    fn hash_tuple() {
+        let mut hs = HashSet::<(String, usize)>::new();
+
+        hs.insert(("Shoulder".to_string(), 1));
     }
 }

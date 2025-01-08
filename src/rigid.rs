@@ -4,14 +4,6 @@ use std::hash::Hash;
 
 use crate::Nodelike;
 
-/// Trait that allows to iterate over a [Rigid]'s degrees of freedom
-pub trait Articulated<T, P> {
-    /// Derivative of a frame of reference `target` (in the axis' *local* coordinate system)
-    /// around (or respectively along) the axis
-    fn derive(&self, target: &T, parameter: &P) -> T;
-    fn transform(&self, parameter: &P) -> T;
-}
-
 /// A Rigid Body represents a single, rigid link connected to other links via a joint.
 /// Synonyms: Bone
 ///
@@ -24,22 +16,18 @@ pub trait Rigid: PartialEq {
     type Point;
     /// typically joint positions (angles/extension), f64, \[f64,3\]
     type Parameter;
-    type Parameters: IntoIterator<Item = Self::Parameter>;
 
     // TODO Explain why this is defined on Rigid (the node) and not Mannequin (the tree) .. in short, otherwise this would be another generic and mannequin.rs would be unreadable because of trait bounds. This way it is quite elegant
     type NodeId: Eq + Hash + Clone;
 
     /// Get the Transformation from the parent taking the connecting joint into account
-    fn transform(&self, params: &Self::Parameters) -> Self::Transformation;
+    fn transform(&self, params: &Self::Parameter) -> Self::Transformation;
 
     /// Transform a point into the world coordinate system
     fn globalize(&self, other: &Self::Point) -> Self::Point;
 
     /// Transform a point into the local coordinate system
     fn localize(&self, other: &Self::Point) -> Self::Point;
-
-    /// Returns a slice to the axes associated with this RigidBody
-    fn axes(&self) -> &[&dyn Articulated<Self::Transformation, Self::Parameter>];
 
     /// ...
     fn n_dof(&self) -> usize;
@@ -57,7 +45,7 @@ pub trait Rigid: PartialEq {
 /// Helper function to be used in [std::iter::Scan] for accumulating transformations from direct path from a root to a node
 pub fn accumulate<'a, Node, Load, NodeRef>(
     stack: &mut Vec<Load::Transformation>,
-    arg: (&'a Node, &Load::Parameters),
+    arg: (&'a Node, &Load::Parameter),
 ) -> Option<(&'a Node, Load::Transformation)>
 where
     Node: Nodelike<Load, NodeRef>,
@@ -85,7 +73,7 @@ where
 {
     fn accumulate_transformations(
         self,
-        param: &[Load::Parameters],
+        param: &[Load::Parameter],
         max_depth: usize,
     ) -> impl Iterator<Item = (&'a Node, Load::Transformation)>;
 }
@@ -99,7 +87,7 @@ where
 {
     fn accumulate_transformations(
         self,
-        param: &[Load::Parameters],
+        param: &[Load::Parameter],
         max_depth: usize,
     ) -> impl Iterator<Item = (&'a Node, <Load as Rigid>::Transformation)> {
         self.into_iter()

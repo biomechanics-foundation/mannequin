@@ -1,4 +1,4 @@
-# Glossary
+# Notes
 
 <!-- todo move to lib.rs -->
 
@@ -13,11 +13,25 @@
 * If there are multiple generic parameters, we use capitalized names similar to struct names, even
   if it becomes more difficult to distinguish them. For one or two generics, single capital Letters may be used.
 
+## Dead ends
+
+* Define a bone as a rigid transformation and multiple axes.
+  * This would offer a more concise interface to joints with multiple DoF
+  * However, at the price of a more convoluted iteration and overall complexity
+  * Nodes would have to reserve space for up to 6DoF
+  * A simpler solution is to have 2D joint identifiers of type `(String,usize)` which can be hashed and
+    offers the same flexibility
+  * A joint that uses 2D spline interpolation would be more difficult and hacky to implement
+    but could be realized as a tuple of nodes with similar data (duplication) and changing the parameter type
+    from `&[f64]` to `&[(f64,f64])` such that both nodes know each other's parameter. Regular 1D axes would
+    ignore the second parameter, or one would use an `enum` (e.g., `Independent(f64)` and `Coupled((f64,f64))`).
+    As this is an unlikely requirement in the future, this workaround seems acceptable.
+
 ## Glossary and synonyms
 
 * **Rigid Body**, *Rigid*, *Bone*: Often called `Bone` in CG and game development. The trait is called `Rigid`
   and implementing structs can use `bone` for instance.
-  In the `mannequin` crate, it consists of a single transformation from a parent to the axis/axes.
+  In the `mannequin` crate, it consists of a single transformation from a parent to the ~~axis/axes~~ *single* axis.
 * **Articulation**, *Articulated*, *Joint*: A ...
 * **Transformation**, *frame of reference*, *(local) coordinate system*: A combination of a rotation
   and subsequent translation. Describes the transformation
