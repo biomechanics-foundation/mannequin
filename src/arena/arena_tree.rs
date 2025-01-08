@@ -1,5 +1,10 @@
 use core::fmt;
 use itertools::Itertools;
+use std::{
+    collections::{hash_map, HashMap},
+    hash::Hash,
+    usize,
+};
 
 use crate::{
     utils::sort_by_indices,
@@ -110,6 +115,8 @@ pub struct ArenaTree<Load, NodeID> {
 
     /// Maximal recursion depth of the dree
     pub(crate) max_depth: usize,
+
+    lookup: HashMap<NodeID, usize>,
 }
 
 impl<Load, NodeId> ArenaTree<Load, NodeId> {
@@ -125,6 +132,7 @@ impl<Load, NodeId> ArenaTree<Load, NodeId> {
             depth_first_cache: None,
             breadh_first_cache: None,
             max_depth: 42,
+            lookup: HashMap::with_capacity(capacity),
         }
     }
 
@@ -138,6 +146,7 @@ impl<Load, NodeId> ArenaTree<Load, NodeId> {
             depth_first_cache: None,
             breadh_first_cache: None,
             max_depth: 42,
+            lookup: HashMap::new(),
         }
     }
 
@@ -160,7 +169,7 @@ impl<Load, NodeId> ArenaTree<Load, NodeId> {
 impl<Load, NodeId> TreeIterable<Load, NodeId> for ArenaTree<Load, NodeId>
 where
     Load: 'static + fmt::Debug + PartialEq,
-    NodeId: std::cmp::PartialEq + 'static + Clone,
+    NodeId: Eq + 'static + Clone + Hash,
 {
     type Node = ArenaNode<Load, NodeId>;
 
@@ -205,16 +214,23 @@ where
 
         let index = self.nodes.len();
 
+        // First check whether we can add the node (id not used yet)
+        // TODO: This check was after updatinng the parent which should be wrong. Confirm that it's working here.
+        if self.nodes.iter().any(|n| n.id() == node_ref) {
+            return Err(MannequinError::NotUnique(node_ref));
+        }
         let parent_index = parent.index;
         let mut parent = self
             .nodes
             .get_mut(parent_index)
             .ok_or(MannequinError::ReferenceOutOfBound(parent_index))?;
+
         // * Get the new node's depth
         // * update the parent's width and add the node as a child
         // * Add the node to the root list if it does not have a parent
 
         parent.children.push(index);
+
         let depth = parent.depth + 1;
         parent.width += 1;
 
@@ -227,9 +243,7 @@ where
             parent.width += 1;
         }
 
-        if self.nodes.iter().any(|n| n.id() == node_ref) {
-            return Err(MannequinError::NotUnique(node_ref));
-        }
+        self.lookup.insert(node_ref.clone(), index);
         // Finally, add the node
         self.nodes.push(ArenaNode::new(
             load,
@@ -263,6 +277,7 @@ where
 
         // reorder the node list and update references
         self.sorting = Some(for_traversal);
+
         match for_traversal {
             DepthFirst => {
                 Self::update_child_indices(&mut self.nodes, self.depth_first_cache.as_ref().unwrap());
@@ -274,6 +289,10 @@ where
                 sort_by_indices(&mut self.nodes, self.breadh_first_cache.take().unwrap());
             }
         }
+        self.lookup.clear();
+        self.nodes.iter().for_each(|node| {
+            self.lookup.insert(node.id.clone(), node.index);
+        });
     }
 
     fn node_by_load(&self, load: &Load) -> Option<&Self::Node> {
@@ -281,7 +300,13 @@ where
     }
 
     fn node_by_id(&self, node_ref: &NodeId) -> Option<&Self::Node> {
-        self.nodes.iter().find(|node| node.id == *node_ref)
+        // A hashmap is be faster: O(1)!
+        // TODO Confirm code is still working
+
+        let index = self.lookup.get(node_ref)?;
+        self.nodes.get(*index)
+
+        // self.nodes.iter().find(|node| node.id == *node_ref)
     }
 
     fn set_root(&mut self, root_load: Load, root_ref: NodeId) -> NodeId {

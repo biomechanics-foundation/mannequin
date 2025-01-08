@@ -17,12 +17,13 @@ description = "Direkt and inverse kinematics for biomechanics, robotics and char
 [dependencies]
 itertools = "0.13.0"
 ndarray = { version = "0.16.1", optional = true, features = ["approx", "rayon"] }
+smallvec = { version = "1.13.2", optional = true }
 thiserror = "2.0.7"
 tracing = "0.1.41"
 tracing-attributes = "0.1.28"
 
 [features]
-ndarray = ["dep:ndarray"]
+ndarray = ["dep:ndarray", "dep:smallvec"]
 
 [dev-dependencies]
 test-log = { version = "0.2.16", features = ["trace"] }

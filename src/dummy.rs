@@ -19,22 +19,19 @@ impl Rigid for DummyBody {
     type Point = i32;
 
     type Parameter = f64;
+    type Parameters = Vec<f64>;
 
     type NodeId = i32;
 
-    fn transformation(&self, param: &Self::Parameter) -> Self::Transformation {
-        self.value * param
-    }
-
-    fn derivative(&self, param: Self::Parameter) -> Self::Transformation {
-        todo!()
+    fn transform(&self, param: &Self::Parameters) -> Self::Transformation {
+        self.value * param[0]
     }
 
     fn neutral_element() -> Self::Transformation {
         todo!()
     }
 
-    fn n_dof(&self) -> i32 {
+    fn n_dof(&self) -> usize {
         1
     }
 
@@ -51,6 +48,10 @@ impl Rigid for DummyBody {
     }
 
     fn invert(trafo: &Self::Transformation) -> Self::Transformation {
+        todo!()
+    }
+
+    fn axes(&self) -> &[&dyn crate::rigid::Articulated<Self::Transformation, Self::Parameter>] {
         todo!()
     }
 }

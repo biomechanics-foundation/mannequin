@@ -1,4 +1,5 @@
-/// Definition of the interfaces for tree iteration
+//! Definition of the interfaces for tree iteration
+use std::hash::Hash;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -42,7 +43,7 @@ pub trait Nodelike<Load, NodeId> {
 pub trait TreeIterable<Load, NodeId>
 where
     Load: PartialEq,
-    NodeId: std::cmp::PartialEq + Clone,
+    NodeId: Eq + Clone + Hash,
 {
     type Node: 'static + Nodelike<Load, NodeId>; // cannot hold references
 

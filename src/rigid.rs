@@ -1,8 +1,19 @@
 /*! Defines the payload carried by [Nodelike] in the context of kinematics/character animation */
 
+use std::hash::Hash;
+
 use crate::Nodelike;
 
+/// Trait that allows to iterate over a [Rigid]'s degrees of freedom
+pub trait Articulated<T, P> {
+    /// Derivative of a frame of reference `target` (in the axis' *local* coordinate system)
+    /// around (or respectively along) the axis
+    fn derive(&self, target: &T, parameter: &P) -> T;
+    fn transform(&self, parameter: &P) -> T;
+}
+
 /// A Rigid Body represents a single, rigid link connected to other links via a joint.
+/// Synonyms: Bone
 ///
 /// Wraps linear algebra transformations such that backends
 /// only need to implement this trait.
@@ -13,11 +24,13 @@ pub trait Rigid: PartialEq {
     type Point;
     /// typically joint positions (angles/extension), f64, \[f64,3\]
     type Parameter;
+    type Parameters: IntoIterator<Item = Self::Parameter>;
 
-    type NodeId: PartialEq + Clone;
+    // TODO Explain why this is defined on Rigid (the node) and not Mannequin (the tree) .. in short, otherwise this would be another generic and mannequin.rs would be unreadable because of trait bounds. This way it is quite elegant
+    type NodeId: Eq + Hash + Clone;
 
     /// Get the Transformation from the parent taking the connecting joint into account
-    fn transformation(&self, param: &Self::Parameter) -> Self::Transformation;
+    fn transform(&self, params: &Self::Parameters) -> Self::Transformation;
 
     /// Transform a point into the world coordinate system
     fn globalize(&self, other: &Self::Point) -> Self::Point;
@@ -25,11 +38,11 @@ pub trait Rigid: PartialEq {
     /// Transform a point into the local coordinate system
     fn localize(&self, other: &Self::Point) -> Self::Point;
 
-    /// ...
-    fn derivative(&self, param: Self::Parameter) -> Self::Transformation;
+    /// Returns a slice to the axes associated with this RigidBody
+    fn axes(&self) -> &[&dyn Articulated<Self::Transformation, Self::Parameter>];
 
     /// ...
-    fn n_dof(&self) -> i32;
+    fn n_dof(&self) -> usize;
 
     /// Returns the eutral element wrt. the transoformation convention used
     fn neutral_element() -> Self::Transformation;
@@ -44,7 +57,7 @@ pub trait Rigid: PartialEq {
 /// Helper function to be used in [std::iter::Scan] for accumulating transformations from direct path from a root to a node
 pub fn accumulate<'a, Node, Load, NodeRef>(
     stack: &mut Vec<Load::Transformation>,
-    arg: (&'a Node, &Load::Parameter),
+    arg: (&'a Node, &Load::Parameters),
 ) -> Option<(&'a Node, Load::Transformation)>
 where
     Node: Nodelike<Load, NodeRef>,
@@ -56,7 +69,7 @@ where
     }
     let current = Load::concat(
         stack.last().unwrap_or(&Load::neutral_element()),
-        &node.get().transformation(param),
+        &node.get().transform(param),
     );
     stack.push(current.clone());
     Some((node, current))
@@ -72,20 +85,21 @@ where
 {
     fn accumulate_transformations(
         self,
-        param: &[Load::Parameter],
+        param: &[Load::Parameters],
         max_depth: usize,
     ) -> impl Iterator<Item = (&'a Node, Load::Transformation)>;
 }
 
-impl<'a, 'b, Node, Load, NodeRef> TransformationAccumulation<'a, Node, Load, NodeRef>
-    for Box<dyn Iterator<Item = &'a Node> + 'b>
+impl<'a, Node, Load, NodeRef, T> TransformationAccumulation<'a, Node, Load, NodeRef> for T
+//Box<dyn Iterator<Item = &'a Node> + 'b>
 where
-    Node: Nodelike<Load, NodeRef>,
+    Node: Nodelike<Load, NodeRef> + 'a,
     Load: Rigid,
+    T: Iterator<Item = &'a Node>,
 {
     fn accumulate_transformations(
         self,
-        param: &[Load::Parameter],
+        param: &[Load::Parameters],
         max_depth: usize,
     ) -> impl Iterator<Item = (&'a Node, <Load as Rigid>::Transformation)> {
         self.into_iter()
