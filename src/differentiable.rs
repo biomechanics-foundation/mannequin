@@ -1,6 +1,5 @@
+use crate::{accumulate, rigid, DepthFirst, Nodelike, Rigid, TransformationAccumulation, TreeIterable};
 use itertools::{izip, Itertools};
-
-use crate::{accumulate, DepthFirst, Rigid, TransformationAccumulation, TreeIterable};
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 use std::hash::Hash;
@@ -40,16 +39,20 @@ where
 
         // I guess either column layout or the transpose if we want to go with the 3 trick
         // now go with transpose
-        let (mut jacobian, m, n) = self.data(); // Array3::<f64>::zeros((m, n, 3));
+        let (jacobian, m, n) = self.data(); // Array3::<f64>::zeros((m, n, 3));
+
+        // We need a good chunk by!
 
         // nomenclature (as in https://stats.stackexchange.com/a/588492): row-, column-, tube fibers
 
         // TODO this does not jet respect multiple axes!
         jacobian
-            .iter_mut()
-            .chunks(n * 3) // TODO let the 3 be determined by the nodes and do a manual `chunk_by`
+            // .iter_mut()
+            .chunks_mut(n * 3) // TODO let the 3 be determined by the nodes and do a manual `chunk_by`
+            // .chunk_by_mut(|_, _| true)
             // TODO use rayon: into_par_iter()
-            .into_iter()
+            // something wrong here
+            // .into_iter()
             .zip(
                 nodes_trafos
                     .iter()
@@ -65,22 +68,23 @@ where
             That works! (surprisingly enough)
             However, a 2D spline joint would be difficult to achieve (but doable with tuples of float as parameter type and a bit of duplication)
             */
-            .for_each(|(mut row, (idx, joint_node, joint_trafo))| {
+            .for_each(|(row, (idx, joint_node, joint_trafo))| {
                 izip!(
                     tree.iter(DepthFirst, Some(joint_node)), // iterating over the child tree
                     // zipping the corresponding trafos (by skipping until the current node)
                     // Using the index here is ok, keeping an iterator is to hard (gets mutated in a different closure)
                     nodes_trafos.iter().skip(*idx).map(|(_, _, trafo)| trafo),
-                    row.chunks(3).into_iter(),
+                    row.chunks_mut(3).into_iter(),
                     active_points.iter()
                 )
                 .filter(|(_, _, _, active)| **active)
-                .for_each(|(point_node, point_trafo, mut tube, _)| {
+                .for_each(|(point_node, point_trafo, tube, _)| {
                     // joint_trafo^{-1} * point_trafo is the argument to compute the displacement
-                    // Assign to slice without bounday checks
-                    tube.into_iter()
-                        .zip(vec![0f64; 3].into_iter())
-                        .for_each(|(a, b)| *a = b);
+                    // Assign to slice with
+
+                    point_node.get().partial_derivative(joint_trafo, point_trafo, tube);
+                    // Or assign
+                    // tube.iter_mut().zip(vec![0f64; 3]).for_each(|(a, b)| *a = b);
                 });
             });
     }

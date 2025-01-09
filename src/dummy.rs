@@ -30,10 +30,6 @@ impl Rigid for DummyBody {
         todo!()
     }
 
-    fn n_dof(&self) -> usize {
-        1
-    }
-
     fn concat(first: &Self::Transformation, second: &Self::Transformation) -> Self::Transformation {
         first + second
     }
@@ -47,6 +43,18 @@ impl Rigid for DummyBody {
     }
 
     fn invert(trafo: &Self::Transformation) -> Self::Transformation {
+        todo!()
+    }
+
+    fn dim(&self) -> usize {
+        todo!()
+    }
+
+    fn effector_count(&self) -> usize {
+        todo!()
+    }
+
+    fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]) {
         todo!()
     }
 }

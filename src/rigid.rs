@@ -29,8 +29,14 @@ pub trait Rigid: PartialEq {
     /// Transform a point into the local coordinate system
     fn localize(&self, other: &Self::Point) -> Self::Point;
 
-    /// ...
-    fn n_dof(&self) -> usize;
+    /// Dimensionality of the partial derivatives (e.g., 3 for position, 6 for position and orientation)
+    fn dim(&self) -> usize;
+
+    /// Compute partial derivative of all effectors
+    fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]);
+
+    /// number of effectors
+    fn effector_count(&self) -> usize;
 
     /// Returns the eutral element wrt. the transoformation convention used
     fn neutral_element() -> Self::Transformation;

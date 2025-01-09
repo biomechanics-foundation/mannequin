@@ -72,10 +72,6 @@ impl Rigid for Bone {
         todo!()
     }
 
-    fn n_dof(&self) -> usize {
-        todo!()
-    }
-
     fn neutral_element() -> Self::Transformation {
         Array2::<f64>::eye(4)
     }
@@ -91,6 +87,18 @@ impl Rigid for Bone {
         let ipos = &trafo.slice(s![..3, 3]) * -1.0;
         result.slice_mut(s![..3, 3]).assign(&ipos);
         result
+    }
+
+    fn dim(&self) -> usize {
+        todo!()
+    }
+
+    fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]) {
+        todo!()
+    }
+
+    fn effector_count(&self) -> usize {
+        todo!()
     }
 }
 
