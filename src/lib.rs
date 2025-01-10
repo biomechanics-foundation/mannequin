@@ -35,7 +35,6 @@ pub use differentiable::{Differentiable, VecJacobian};
 pub use iterable_tree::{
     MannequinError, Nodelike, Order,
     Order::{BreadthFirst, DepthFirst},
-    TreeIterable,
 };
 pub use mannequin::{Forward, Inverse, Mannequin};
 pub use rigid::{accumulate, Rigid, TransformationAccumulation};
