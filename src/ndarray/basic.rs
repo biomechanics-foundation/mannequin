@@ -10,12 +10,16 @@ use itertools::Itertools;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 use ndarray::{Array1, Array2};
+use std::default;
 
-#[derive(Debug, PartialEq)]
+use super::invert_tranformation_4x4;
 
-pub enum Axes {
+#[derive(Debug, PartialEq, Default)]
+
+pub enum Axis {
     RotationX,
     RotationY,
+    #[default]
     RotationZ,
     Rotation(Array1<f64>),
     TranslationX,
@@ -25,24 +29,32 @@ pub enum Axes {
 }
 
 #[derive(Debug, Default, PartialEq)]
+pub enum Mode {
+    #[default]
+    Position,
+    Pose,
+}
+
+#[derive(Debug, Default, PartialEq)]
 pub struct Bone {
     link: Array2<f64>,
-    // TODO: I assume that having the axis at the same memory location is faster
+    axis: Axis,
+    mode: Mode,
 }
 
 impl Bone {
-    pub fn new(from_parent: &Array2<f64>) -> Self {
+    pub fn new(from_parent: &Array2<f64>, axis: Axis) -> Self {
         Self {
             link: from_parent.clone(),
-            ..Default::default()
+            axis,
+            mode: Mode::Position,
         }
     }
 }
 
 impl fmt::Display for Bone {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Just a Bone")
-        // TODO add axes type
+        write!(f, "Bone, link: {}, Axis: {:?}", self.link, self.axis)
     }
 }
 
@@ -56,20 +68,16 @@ impl Rigid for Bone {
     type NodeId = String;
 
     fn transform(&self, param: &Self::Parameter) -> Self::Transformation {
-        array![
-            [param.cos(), -1.0 * param.sin(), 0.0, 0.0],
-            [param.sin(), param.cos(), 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0]
-        ]
+        // TODO: this can be a reference
+        self.link.clone()
     }
 
     fn globalize(&self, other: &Self::Point) -> Self::Point {
-        todo!()
+        self.link.dot(other)
     }
 
     fn localize(&self, other: &Self::Point) -> Self::Point {
-        todo!()
+        invert_tranformation_4x4(&self.link).dot(other)
     }
 
     fn neutral_element() -> Self::Transformation {
@@ -81,24 +89,28 @@ impl Rigid for Bone {
     }
 
     fn invert(trafo: &Self::Transformation) -> Self::Transformation {
-        let mut result = Self::neutral_element();
-        let rot = trafo.slice(s![..3, ..3]);
-        result.slice_mut(s![..3, ..3]).assign(&rot.t());
-        let ipos = &trafo.slice(s![..3, 3]) * -1.0;
-        result.slice_mut(s![..3, 3]).assign(&ipos);
-        result
+        invert_tranformation_4x4(trafo)
     }
 
     fn dim(&self) -> usize {
-        todo!()
+        match self.mode {
+            Mode::Position => 3,
+            Mode::Pose => 6,
+        }
     }
 
     fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]) {
-        todo!()
+        match self.mode {
+            Mode::Pose => {
+                let end_effector = local.slice(s![..3, 3]);
+                // TODO We need the axis of the joint .. i.e., the joint itself
+            }
+            Mode::Position => unimplemented!(),
+        }
     }
 
     fn effector_count(&self) -> usize {
-        todo!()
+        1
     }
 }
 
@@ -158,12 +170,12 @@ impl Inverse<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics> for Differen
     }
 }
 
-pub type Robot = Mannequin<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics, DifferentialIK>;
+pub type BasicMannequin = Mannequin<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics, DifferentialIK>;
 
 #[cfg(test)]
 mod tests {
-    use super::super::NDArrayJacobian;
-    use super::{Bone, DifferentialIK, ForwardsKinematics, LinkNodeId};
+    use super::super::Jacobian;
+    use super::{Axis, Bone, DifferentialIK, ForwardsKinematics, LinkNodeId};
     use crate::{
         ArenaTree, Differentiable, Forward, Nodelike, Order::DepthFirst, Rigid, TransformationAccumulation,
         TreeIterable,
@@ -180,10 +192,10 @@ mod tests {
         let mut trafo = Bone::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
 
-        let link1 = Bone::new(&trafo);
-        let link2 = Bone::new(&trafo);
-        let link3 = Bone::new(&trafo);
-        let link4 = Bone::new(&trafo);
+        let link1 = Bone::new(&trafo, Axis::RotationZ);
+        let link2 = Bone::new(&trafo, Axis::RotationZ);
+        let link3 = Bone::new(&trafo, Axis::RotationZ);
+        let link4 = Bone::new(&trafo, Axis::RotationZ);
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
@@ -215,10 +227,10 @@ mod tests {
         let mut trafo = Bone::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
 
-        let link1 = Bone::new(&trafo);
-        let link2 = Bone::new(&trafo);
-        let link3 = Bone::new(&trafo);
-        let link4 = Bone::new(&trafo);
+        let link1 = Bone::new(&trafo, Axis::RotationZ);
+        let link2 = Bone::new(&trafo, Axis::RotationZ);
+        let link3 = Bone::new(&trafo, Axis::RotationZ);
+        let link4 = Bone::new(&trafo, Axis::RotationZ);
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
@@ -230,7 +242,7 @@ mod tests {
 
         tree.optimize(DepthFirst);
 
-        let mut jacobian = NDArrayJacobian::new();
+        let mut jacobian = Jacobian::new();
         jacobian.setup(
             &tree,
             &[

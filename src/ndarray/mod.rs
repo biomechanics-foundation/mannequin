@@ -1,24 +1,24 @@
-//! Module for the implementations using the ndarray backend.
-use crate::{Differentiable, Rigid, TreeIterable, VecJacobian};
+//! Module for the implementations using the ndarray backend. Coontains the basic calculus required
+use crate::{Differentiable, MannequinError, Rigid, TreeIterable, VecJacobian};
 use ndarray::prelude::*;
 use std::collections::HashSet;
 use std::hash::Hash;
 
 pub mod basic;
 
-pub struct NDArrayJacobian {
+/// Jacobian using ndarray for numerics
+#[derive(Debug, Default)]
+pub struct Jacobian {
     base: VecJacobian,
 }
 
-impl NDArrayJacobian {
+impl Jacobian {
     pub fn new() -> Self {
-        Self {
-            base: VecJacobian::new(),
-        }
+        Self::default()
     }
 }
 
-impl Differentiable for NDArrayJacobian {
+impl Differentiable for Jacobian {
     // Note: could ArrayView too
     type Data = Array2<f64>;
 
@@ -27,8 +27,6 @@ impl Differentiable for NDArrayJacobian {
     }
 
     fn data(&mut self) -> &mut [f64] {
-        // (self.base as dyn Differentiable<T, R, I, Data = Vec<f64>>).data()
-        // <VecJacobian as Differentiable<T, R, I>>::data(&mut self.base)
         self.base.data()
     }
 
@@ -38,16 +36,15 @@ impl Differentiable for NDArrayJacobian {
         R: Rigid,
         I: Eq + Clone + Hash,
     {
-        // <VecJacobian as Differentiable<T, R, I>>::setup(&mut self.base, tree, active_joints, active_points)
         self.base.setup(tree, active_joints, active_points)
     }
 
     fn rows(&self) -> usize {
-        todo!()
+        self.base.rows()
     }
 
     fn cols(&self) -> usize {
-        todo!()
+        self.base.cols()
     }
 
     fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter])
@@ -58,4 +55,83 @@ impl Differentiable for NDArrayJacobian {
     {
         self.base.compute(tree, params)
     }
+}
+
+/// Creates a homogeneous, 4x4 rotation matrix around the x axis.
+pub fn rotate_x_4x4(param: f64) -> Array2<f64> {
+    array![
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, param.cos(), -1.0 * param.sin(), 0.0],
+        [0.0, param.sin(), param.cos(), 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+    ]
+}
+
+/// Creates a homogeneous, 4x4 rotation matrix around the y axis.
+pub fn rotate_y_4x4(param: f64) -> Array2<f64> {
+    array![
+        [param.cos(), 0.0, param.sin(), 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [(-1.0) * param.sin(), 0.0, param.cos(), 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+    ]
+}
+
+/// Creates a homogeneous, 4x4 rotation matrix around the z axis.
+pub fn rotate_z_4x4(param: f64) -> Array2<f64> {
+    array![
+        [param.cos(), -1.0 * param.sin(), 0.0, 0.0],
+        [param.sin(), param.cos(), 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+    ]
+}
+
+/// Creates a homogeneous, 4x4 translation matrix along the x axis.
+pub fn translate_x_4x4(param: f64) -> Array2<f64> {
+    array![
+        [1.0, 0.0, 0.0, param],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+}
+
+/// Creates a homogeneous, 4x4 translation matrix along the y axis.
+pub fn translate_y_4x4(param: f64) -> Array2<f64> {
+    array![
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, param],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+}
+
+/// Creates a homogeneous, 4x4 translation matrix along the z axis.
+pub fn translate_z_4x4(param: f64) -> Array2<f64> {
+    array![
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, param],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+}
+
+/// Create a translation from a slice
+pub fn translation<T>(param: &[f64]) -> Result<Array2<f64>, MannequinError<T>> {
+    let mut result = Array2::<f64>::eye(4);
+    result
+        .slice_mut(s![..3, 3])
+        .assign(&ArrayView1::<f64>::from_shape(3, param)?);
+    Ok(result)
+}
+
+/// inverts a homogeneous, 4x4 tranformation matrix.
+pub fn invert_tranformation_4x4(trafo: &Array2<f64>) -> Array2<f64> {
+    let mut result = Array2::<f64>::eye(4);
+    let rot = trafo.slice(s![..3, ..3]);
+    result.slice_mut(s![..3, ..3]).assign(&rot.t());
+    let ipos = &trafo.slice(s![..3, 3]) * -1.0;
+    result.slice_mut(s![..3, 3]).assign(&ipos);
+    result
 }

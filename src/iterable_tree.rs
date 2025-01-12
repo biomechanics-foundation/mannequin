@@ -4,6 +4,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum MannequinError<NodeID> {
+    // Internal errors
     #[error("Node reference {0} is out of bound")]
     ReferenceOutOfBound(usize),
     #[error("Node not in tree: {0}")]
@@ -12,6 +13,12 @@ pub enum MannequinError<NodeID> {
     RootNotSet,
     #[error("ID not unique: {0}")]
     NotUnique(NodeID),
+    // Errors specific to ndarray
+    #[cfg(feature = "ndarray")]
+    #[error("Error raised by NDArray: ")]
+    ShapeError(#[from] ndarray::ShapeError),
+    // TODO Errors specific to nalgebra
+    // TODO Errors specific to faer
 }
 
 /// Order of iteration
