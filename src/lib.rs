@@ -31,6 +31,7 @@ pub mod rigid;
 pub mod utils;
 
 pub use arena::{ArenaNode, ArenaTree};
+pub use differentiable::{Differentiable, VecJacobian};
 pub use iterable_tree::{
     MannequinError, Nodelike, Order,
     Order::{BreadthFirst, DepthFirst},

@@ -2,14 +2,17 @@
 #![allow(unused_variables)]
 
 use crate::{
-    accumulate, ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation,
-    TreeIterable,
+    accumulate, ArenaTree, DepthFirst, Differentiable, Forward, Inverse, Mannequin, Nodelike, Rigid,
+    TransformationAccumulation, TreeIterable, VecJacobian,
 };
 use core::fmt;
 use itertools::Itertools;
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 use ndarray::{Array1, Array2};
+use std::collections::HashSet;
+use std::hash::Hash;
+use std::marker::PhantomData;
 
 #[derive(Debug, PartialEq)]
 
@@ -136,76 +139,73 @@ pub struct DifferentialIK {
     max_depth: usize,
 }
 
+pub struct NDArrayJacobian<T, R, I>
+where
+    T: TreeIterable<R, I>,
+    R: Rigid,
+    I: Eq + Clone + Hash,
+{
+    base: VecJacobian,
+    t: PhantomData<T>,
+    r: PhantomData<R>,
+    i: PhantomData<I>,
+}
+
+impl<T, R, I> NDArrayJacobian<T, R, I>
+where
+    T: TreeIterable<R, I>,
+    R: Rigid,
+    I: Eq + Clone + Hash,
+{
+    pub fn new() -> Self {
+        Self {
+            base: VecJacobian::new(),
+            t: PhantomData,
+            i: PhantomData,
+            r: PhantomData,
+        }
+    }
+}
+
+impl<T, R, I> Differentiable<T, R, I> for NDArrayJacobian<T, R, I>
+where
+    T: TreeIterable<R, I>,
+    R: Rigid,
+    I: Eq + Clone + Hash,
+{
+    // Note: could ArrayView too
+    type Data = Array2<f64>;
+
+    fn jacobian(&self) -> &Self::Data {
+        todo!()
+    }
+
+    fn data(&mut self) -> &mut [f64] {
+        // (self.base as dyn Differentiable<T, R, I, Data = Vec<f64>>).data()
+        <VecJacobian as Differentiable<T, R, I>>::data(&mut self.base)
+    }
+
+    fn setup(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>) {
+        <VecJacobian as Differentiable<T, R, I>>::setup(&mut self.base, tree, active_joints, active_points)
+    }
+
+    fn rows(&self) -> usize {
+        todo!()
+    }
+
+    fn cols(&self) -> usize {
+        todo!()
+    }
+
+    fn compute(&mut self, tree: &T, params: &[<R as Rigid>::Parameter]) {
+        <VecJacobian as Differentiable<T, R, I>>::compute(&mut self.base, tree, params)
+    }
+}
+
 pub type DifferentialIKParameter =
     <DifferentialIK as Inverse<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics>>::Parameter;
 pub type DifferentialIKArray =
     <DifferentialIK as Inverse<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics>>::Array;
-
-impl DifferentialIK {
-    pub fn jacobian(&self, tree: &ArenaTree<Bone, LinkNodeId>, params: DifferentialIKParameter) -> DifferentialIKArray {
-        // jacobian
-        //     .axis_iter_mut(Axis(0))
-        //     .into_par_iter()
-        //     .zip(tree.iter(DepthFirst, &[]).accumulate(param, max).into_par_iter())
-        //     .for_each(|(row, (node, trafo))| {
-        //         println!("{row}, {node}, {trafo}");
-
-        //         // tree
-        //         //     .iter(DepthFirst, &[tree.node_ref(node)])
-        //         //     .accumulate(param, max)
-        //         //     .zip(row.iter_chunks(3))
-        //         //     .for_each(|(cell, (node, transformation)| {
-        //         //         // compute displacement
-        //         //     });
-        //     });
-
-        // Added annotation for IDE
-        let nodes_trafos = tree
-            .iter(DepthFirst, None)
-            .accumulate_transformations(params.as_slice().unwrap(), self.max_depth)
-            .enumerate()
-            .collect_vec();
-
-        let n_dof = nodes_trafos.len(); // number of degrees of freedom
-        let n_tcp = nodes_trafos.len(); // number of tool center points
-
-        // Trick we reduce a 3D (n x m x o) array to a two dimensional one (x*m,o) after iteration
-        let mut jacobian = Array3::<f64>::zeros((n_dof, 3, n_tcp));
-
-        // Warning filtering could be interesting! Cannot do it after `into_par_iter`
-
-        jacobian
-            .axis_iter_mut(Axis(0))
-            // .into_par_iter()
-            .zip(
-                nodes_trafos.iter(), // .par_iter()
-            )
-            .for_each(|(mut dof, (idx, (node, trafo)))| {
-                // dof: (3,n_tcp)
-                println!("row: {dof}, idx: {idx}, depth: {}", node.depth());
-                let x = nodes_trafos
-                    .iter()
-                    .skip(*idx + 1)
-                    .map(|(idx, (node, _))| (idx, node.depth()))
-                    .collect_vec();
-                println!("{x:?}");
-                nodes_trafos
-                    .iter()
-                    .skip(*idx + 1)
-                    .take_while(|(_, (child, _))| child.depth() > node.depth())
-                    .for_each(|(idx, (child, child_trafo))| {
-                        let local = Bone::concat(&Bone::invert(trafo), child_trafo);
-                        let pos = local.slice(s![..3, 3]);
-
-                        dof.slice_mut(s![..3, *idx]).assign(&pos);
-
-                        println!("column:{}, {}, {dof}", idx + 1, child.depth())
-                    })
-            });
-        // is this slower?
-        jacobian.into_shape_with_order((n_dof * 3, n_tcp)).unwrap()
-    }
-}
 
 impl Inverse<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics> for DifferentialIK {
     type Parameter = Array1<f64>;
@@ -234,8 +234,10 @@ mod tests {
     use ndarray::prelude::*;
 
     use crate::{
-        ndarray::robot::LinkNodeId, ArenaTree, Forward, Nodelike, Order::DepthFirst, Rigid, TransformationAccumulation,
-        TreeIterable,
+        ndarray::robot::{LinkNodeId, NDArrayJacobian},
+        ArenaTree, Differentiable, Forward, Nodelike,
+        Order::DepthFirst,
+        Rigid, TransformationAccumulation, TreeIterable,
     };
 
     use super::{Bone, DifferentialIK, ForwardsKinematics};
@@ -298,9 +300,24 @@ mod tests {
 
         tree.optimize(DepthFirst);
 
-        let jacobian = ik.jacobian(&tree, array![0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
+        let mut jacobian = NDArrayJacobian::<ArenaTree<Bone, LinkNodeId>, Bone, LinkNodeId>::new();
+        jacobian.setup(
+            &tree,
+            &[
+                "link1".to_string(),
+                "link2".to_string(),
+                "link3".to_string(),
+                "link4".to_string(),
+            ]
+            .into(),
+            &["link2".to_string(), "link4".to_string()].into(),
+        );
 
-        println!("jacobian: {jacobian:?}");
+        jacobian.compute(&tree, &[0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
+
+        // let jacobian = ik.jacobian(&tree, array![0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
+
+        println!("jacobian: {}", jacobian.jacobian());
     }
 
     #[test]

@@ -38,6 +38,12 @@ pub trait Rigid: PartialEq {
     /// number of effectors
     fn effector_count(&self) -> usize;
 
+    /// The number of rows / elements the effector take in the jacobian matrix (usually dim * cound).
+    /// However, by manually granting contol, one can have effocters with different dimensionality
+    fn effector_size(&self) -> usize {
+        self.dim() * self.effector_count()
+    }
+
     /// Returns the eutral element wrt. the transoformation convention used
     fn neutral_element() -> Self::Transformation;
 

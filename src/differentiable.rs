@@ -71,7 +71,7 @@ where
             .scan(0, |offset, node| {
                 let result = Some(*offset);
                 if active_points.get(&node.id()).is_some() {
-                    *offset += node.get().dim() * node.get().effector_count();
+                    *offset += node.get().effector_size();
                 }
                 result
             })
@@ -129,12 +129,12 @@ where
                 )
                 .filter(|(_, _, _, active)| **active)
                 .for_each(|(point_node, point_trafo, offset, _)| {
-                    // Todo, store in node (optimization)
-                    let size = point_node.get().effector_count() * point_node.get().dim();
                     // The slice of the colum is itself a column-first matrix
-                    point_node
-                        .get()
-                        .partial_derivative(joint_trafo, point_trafo, &mut col[*offset..*offset + size]);
+                    point_node.get().partial_derivative(
+                        joint_trafo,
+                        point_trafo,
+                        &mut col[*offset..*offset + point_node.get().effector_size()],
+                    );
                 });
             });
     }
@@ -146,45 +146,6 @@ mod ndarray {
     use crate::{Rigid, TreeIterable};
     use ndarray::Array2;
     use std::{collections::HashSet, hash::Hash};
-
-    pub struct NDArrayJacobian {
-        base: VecJacobian,
-    }
-
-    impl<T, R, I> Differentiable<T, R, I> for NDArrayJacobian
-    where
-        T: TreeIterable<R, I>,
-        R: Rigid,
-        I: Eq + Clone + Hash,
-    {
-        // Note: could ArrayView too
-        type Data = Array2<f64>;
-
-        fn jacobian(&self) -> &Self::Data {
-            todo!()
-        }
-
-        fn data(&mut self) -> &mut [f64] {
-            // (self.base as dyn Differentiable<T, R, I, Data = Vec<f64>>).data()
-            <VecJacobian as Differentiable<T, R, I>>::data(&mut self.base)
-        }
-
-        fn setup(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>) {
-            <VecJacobian as Differentiable<T, R, I>>::setup(&mut self.base, tree, active_joints, active_points)
-        }
-
-        fn rows(&self) -> usize {
-            todo!()
-        }
-
-        fn cols(&self) -> usize {
-            todo!()
-        }
-
-        fn compute(&mut self, tree: &T, params: &[<R as Rigid>::Parameter]) {
-            <VecJacobian as Differentiable<T, R, I>>::compute(&mut self.base, tree, params)
-        }
-    }
 }
 
 #[cfg(feature = "nalgebra")]
