@@ -328,3 +328,4 @@ $RECYCLE.BIN/
 
 # exclude private examples
 examples/priv_*.rs
+biomech.png

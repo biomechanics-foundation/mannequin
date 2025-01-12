@@ -5,20 +5,23 @@ use rayon::prelude::*;
 use std::{collections::HashSet, hash::Hash};
 
 // TODO maybe make precision generic
-pub trait Differentiable<T, R, I>
-where
-    T: TreeIterable<R, I>,
-    R: Rigid,
-    I: Eq + Clone + Hash,
-{
+pub trait Differentiable {
     type Data;
 
     /// returns a reference to the internal data type
     fn jacobian(&self) -> &Self::Data;
 
     /// compute the jacobian matrix
-    fn setup(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>);
-    fn compute(&mut self, tree: &T, params: &[R::Parameter]); //, active_joints: &[bool], active_points: &[bool]);
+    fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>)
+    where
+        T: TreeIterable<R, I>,
+        R: Rigid,
+        I: Eq + Clone + Hash;
+    fn compute<T, R, I>(&mut self, tree: &T, params: &[R::Parameter])
+    where
+        T: TreeIterable<R, I>,
+        R: Rigid,
+        I: Eq + Clone + Hash; //, active_joints: &[bool], active_points: &[bool]);
 
     /// provide a reference to the raw data and the dimensions of its axes (so first the major axis)
     fn data(&mut self) -> &mut [f64];
@@ -45,19 +48,19 @@ impl VecJacobian {
     }
 }
 
-impl<T, R, I> Differentiable<T, R, I> for VecJacobian
-where
-    T: TreeIterable<R, I>,
-    R: Rigid,
-    I: Eq + Clone + Hash,
-{
+impl Differentiable for VecJacobian {
     type Data = Vec<f64>;
 
     fn jacobian(&self) -> &Self::Data {
         todo!()
     }
 
-    fn setup(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>) {
+    fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>)
+    where
+        T: TreeIterable<R, I>,
+        R: Rigid,
+        I: Eq + Clone + Hash,
+    {
         self.active_joints = tree
             .iter(DepthFirst, None)
             .map(|n| active_joints.get(&n.id()).is_some())
@@ -96,7 +99,12 @@ where
         self.cols
     }
 
-    fn compute(&mut self, tree: &T, params: &[<R as Rigid>::Parameter]) {
+    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter])
+    where
+        T: TreeIterable<R, I>,
+        R: Rigid,
+        I: Eq + Clone + Hash,
+    {
         // compute transformations only once
         let nodes_trafos = tree
             .iter(DepthFirst, None)
