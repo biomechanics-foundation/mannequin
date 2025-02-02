@@ -54,7 +54,13 @@ impl Rigid for DummyBody {
         todo!()
     }
 
-    fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]) {
+    fn partial_derivative(
+        &self,
+        pose: &Self::Transformation,
+        joint: &Self,
+        joint_pose: &Self::Transformation,
+        target_buffer: &mut [f64],
+    ) {
         todo!()
     }
 }

@@ -33,8 +33,17 @@ pub trait Rigid: PartialEq {
     fn dim(&self) -> usize;
 
     /// Compute partial derivative of all effectors
-    /// joint: the pose of the joint in world coordinates, local: the current's pose in world coordinates, target: store the results here
-    fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]);
+    /// pose: This node's FoR in global coordinates
+    /// joint: Reference to the joint node
+    /// joint_pose: the joint's FoR in global coordinates
+    /// target_buffer: Memory location to where the results are written too.
+    fn partial_derivative(
+        &self,
+        pose: &Self::Transformation,
+        joint: &Self,
+        joint_pose: &Self::Transformation,
+        target_buffer: &mut [f64],
+    );
 
     /// number of effectors
     fn effector_count(&self) -> usize;

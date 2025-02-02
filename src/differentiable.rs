@@ -126,7 +126,7 @@ impl Differentiable for VecJacobian {
                     .filter_map(|(x, active)| if *active { Some(x) } else { None }), // filter inactive joints and remove flag
                                                                                      // .par_iter()
             )
-            .for_each(|(col, (idx, joint_node, joint_trafo))| {
+            .for_each(|(col, (idx, joint_node, joint_pose))| {
                 izip!(
                     tree.iter(DepthFirst, Some(joint_node)), // iterating over the child tree
                     // zipping the corresponding trafos (by skipping until the current node) and the offsets in the column
@@ -136,12 +136,13 @@ impl Differentiable for VecJacobian {
                     self.active_points.iter()
                 )
                 .filter(|(_, _, _, active)| **active)
-                .for_each(|(point_node, point_trafo, offset, _)| {
+                .for_each(|(effector_node, effector_pose, offset, _)| {
                     // The slice of the colum is itself a column-first matrix
-                    point_node.get().partial_derivative(
-                        joint_trafo,
-                        point_trafo,
-                        &mut col[*offset..*offset + point_node.get().effector_size()],
+                    effector_node.get().partial_derivative(
+                        effector_pose,
+                        joint_node.get(),
+                        joint_pose,
+                        &mut col[*offset..*offset + effector_node.get().effector_size()],
                     );
                 });
             });

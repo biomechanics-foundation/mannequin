@@ -99,19 +99,38 @@ impl Rigid for Bone {
         }
     }
 
-    fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]) {
-        match self.mode {
-            Mode::Pose => {
-                let end_effector = local.slice(s![..3, 3]);
-                // TODO We need the axis of the joint .. i.e., the joint itself
-            }
-            Mode::Position => unimplemented!(),
-        }
-    }
-
     fn effector_count(&self) -> usize {
         1
     }
+
+    fn partial_derivative(
+        &self,
+        pose: &Self::Transformation,
+        joint: &Self,
+        joint_pose: &Self::Transformation,
+        target_buffer: &mut [f64],
+    ) {
+        match &joint.axis {
+            Axis::RotationX => todo!(),
+            Axis::RotationY => todo!(),
+            Axis::RotationZ => todo!(),
+            Axis::Rotation(array_base) => todo!(),
+            Axis::TranslationX => todo!(),
+            Axis::TranslationY => todo!(),
+            Axis::TranslationZ => todo!(),
+            Axis::Translation(array_base) => todo!(),
+        };
+        todo!()
+    }
+    // fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]) {
+    //     match self.mode {
+    //         Mode::Pose => {
+    //             let end_effector = local.slice(s![..3, 3]);
+    //             // TODO We need the axis of the joint .. i.e., the joint itself
+    //         }
+    //         Mode::Position => unimplemented!(),
+    //     }
+    // }
 }
 
 type LinkNodeId = <Bone as Rigid>::NodeId;
