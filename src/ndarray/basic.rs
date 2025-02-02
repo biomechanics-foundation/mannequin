@@ -12,10 +12,11 @@ use ndarray::prelude::*;
 use ndarray::{Array1, Array2};
 use std::default;
 
-use super::invert_tranformation_4x4;
+use super::{cross_3d, invert_tranformation_4x4};
+
+// const XAXIS: Array1<f64> = array![1.0, 0.0, 0.0, 0.0, 0.0];
 
 #[derive(Debug, PartialEq, Default)]
-
 pub enum Axis {
     RotationX,
     RotationY,
@@ -95,7 +96,7 @@ impl Rigid for Bone {
     fn dim(&self) -> usize {
         match self.mode {
             Mode::Position => 3,
-            Mode::Pose => 6,
+            Mode::Pose => unimplemented!(), //6,
         }
     }
 
@@ -110,17 +111,28 @@ impl Rigid for Bone {
         joint_pose: &Self::Transformation,
         target_buffer: &mut [f64],
     ) {
-        match &joint.axis {
-            Axis::RotationX => todo!(),
-            Axis::RotationY => todo!(),
-            Axis::RotationZ => todo!(),
-            Axis::Rotation(array_base) => todo!(),
-            Axis::TranslationX => todo!(),
-            Axis::TranslationY => todo!(),
-            Axis::TranslationZ => todo!(),
-            Axis::Translation(array_base) => todo!(),
+        // Formula: axis_in_world x (end_effector_world - pivod_in_world)
+        let local_axis = match &joint.axis {
+            Axis::RotationX => &array![1.0, 0.0, 0.0, 0.0],
+            Axis::RotationY => &array![0.0, 1.0, 0.0, 0.0],
+            Axis::RotationZ => &array![0.0, 0.0, 1.0, 0.0],
+            Axis::Rotation(array_base) => array_base,
+            Axis::TranslationX => unimplemented!(),
+            Axis::TranslationY => unimplemented!(),
+            Axis::TranslationZ => unimplemented!(),
+            Axis::Translation(array_base) => unimplemented!(),
         };
-        todo!()
+        let axis_global = joint_pose.dot(local_axis);
+        // .clone().slice(s![0..3]);
+        let lever = &joint_pose.slice(s![0..3, 3]) - &pose.slice(s![0..3, 3]);
+
+        // let target = ArrayViewMut1::from(target_buffer);
+        cross_3d::<Self::NodeId>(
+            axis_global.slice(s![0..3]),
+            lever.view(),
+            ArrayViewMut1::from(target_buffer),
+        )
+        .unwrap();
     }
     // fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]) {
     //     match self.mode {

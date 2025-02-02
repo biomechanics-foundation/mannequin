@@ -1,6 +1,6 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
 use crate::{Differentiable, MannequinError, Rigid, TreeIterable, VecJacobian};
-use ndarray::prelude::*;
+use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
 use std::collections::HashSet;
 use std::hash::Hash;
 
@@ -134,4 +134,21 @@ pub fn invert_tranformation_4x4(trafo: &Array2<f64>) -> Array2<f64> {
     let ipos = &trafo.slice(s![..3, 3]) * -1.0;
     result.slice_mut(s![..3, 3]).assign(&ipos);
     result
+}
+
+pub fn cross_3d<T>(
+    a: ArrayView1<f64>,
+    b: ArrayView1<f64>,
+    mut target: ArrayViewMut1<f64>,
+) -> Result<(), MannequinError<T>> {
+    if a.len() != 3 || b.len() != 3 || target.len() != 3 {
+        Err(ShapeError::from_kind(IncompatibleShape).into())
+    } else {
+        // TODO, is vec slower than
+
+        target[0] = a[2] * b[3] - a[3] * b[2];
+        target[1] = a[3] * b[1] - a[1] * b[3];
+        target[2] = a[1] * b[2] - a[2] * b[1];
+        Ok(())
+    }
 }

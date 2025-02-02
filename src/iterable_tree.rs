@@ -13,6 +13,8 @@ pub enum MannequinError<NodeID> {
     RootNotSet,
     #[error("ID not unique: {0}")]
     NotUnique(NodeID),
+    #[error("Wrong array dimensions: {0}")]
+    DimensionMismatch(usize),
     // Errors specific to ndarray
     #[cfg(feature = "ndarray")]
     #[error("Error raised by NDArray: ")]
