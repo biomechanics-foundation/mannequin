@@ -20,10 +20,14 @@ impl Jacobian {
 
 impl Differentiable for Jacobian {
     // Note: could ArrayView too
-    type Data = Array2<f64>;
+    type Data<'a> = ArrayView2<'a, f64>;
 
-    fn jacobian(&self) -> &Self::Data {
-        todo!()
+    fn jacobian(&self) -> Self::Data<'_> {
+        let data = self.base.jacobian();
+        let result = ArrayView1::<f64>::from(data.as_slice())
+            .into_shape_with_order((self.base.rows(), self.base.cols()))
+            .unwrap();
+        result
     }
 
     fn data(&mut self) -> &mut [f64] {
@@ -146,9 +150,9 @@ pub fn cross_3d<T>(
     } else {
         // TODO, is vec slower than
 
-        target[0] = a[2] * b[3] - a[3] * b[2];
-        target[1] = a[3] * b[1] - a[1] * b[3];
-        target[2] = a[1] * b[2] - a[2] * b[1];
+        target[0] = a[1] * b[2] - a[2] * b[1];
+        target[1] = a[2] * b[0] - a[0] * b[2];
+        target[2] = a[0] * b[1] - a[1] * b[0];
         Ok(())
     }
 }

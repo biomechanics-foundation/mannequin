@@ -311,8 +311,9 @@ where
 
     fn set_root(&mut self, root_load: Load, root_ref: NodeId) -> NodeId {
         self.nodes.clear();
-        let root = ArenaNode::<Load, NodeId>::new(root_load, root_ref, 0, 1, vec![], 0, None);
+        let root = ArenaNode::<Load, NodeId>::new(root_load, root_ref.clone(), 0, 1, vec![], 0, None);
         self.nodes.push(root);
+        self.lookup.insert(root_ref, 0);
         self.nodes[0].id.clone()
     }
 

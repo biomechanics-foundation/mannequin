@@ -6,11 +6,14 @@ use std::{collections::HashSet, hash::Hash};
 
 // TODO maybe make precision generic
 pub trait Differentiable {
-    type Data;
+    type Data<'a>
+    where
+        Self: 'a;
 
     /// returns a reference to the internal data type
-    fn jacobian(&self) -> &Self::Data;
+    fn jacobian(&self) -> Self::Data<'_>;
 
+    // TODO
     /// compute the jacobian matrix
     fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>)
     where
@@ -49,10 +52,10 @@ impl VecJacobian {
 }
 
 impl Differentiable for VecJacobian {
-    type Data = Vec<f64>;
+    type Data<'a> = &'a Vec<f64>;
 
-    fn jacobian(&self) -> &Self::Data {
-        todo!()
+    fn jacobian(&self) -> Self::Data<'_> {
+        &self.data
     }
 
     fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>)

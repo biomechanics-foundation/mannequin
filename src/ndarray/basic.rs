@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_jacobian() {
-        let mut ik = DifferentialIK { max_depth: 10 };
+        let ik = DifferentialIK { max_depth: 10 };
         let mut tree = ArenaTree::<Bone, LinkNodeId>::new();
 
         let mut trafo = Bone::neutral_element();
