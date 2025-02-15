@@ -15,7 +15,7 @@ pub trait Differentiable {
 
     // TODO
     /// compute the jacobian matrix
-    fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>)
+    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<I>, selected_effectors: &HashSet<I>)
     where
         T: TreeIterable<R, I>,
         R: Rigid,
@@ -24,7 +24,7 @@ pub trait Differentiable {
     where
         T: TreeIterable<R, I>,
         R: Rigid,
-        I: Eq + Clone + Hash + Debug; //, active_joints: &[bool], active_points: &[bool]);
+        I: Eq + Clone + Hash + Debug;
 
     /// provide a reference to the raw data and the dimensions of its axes (so first the major axis)
     fn data(&mut self) -> &mut [f64];
@@ -41,8 +41,8 @@ pub struct VecJacobian {
     cols: usize,
     /// row index at which each effector note starts
     offsets: Vec<usize>,
-    active_joints: Vec<bool>,
-    active_points: Vec<bool>,
+    selected_joints: Vec<bool>,
+    selected_effectors: Vec<bool>,
 }
 
 impl VecJacobian {
@@ -58,25 +58,25 @@ impl Differentiable for VecJacobian {
         &self.data
     }
 
-    fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>)
+    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<I>, selected_effectors: &HashSet<I>)
     where
         T: TreeIterable<R, I>,
         R: Rigid,
         I: Eq + Clone + Hash + Debug,
     {
-        self.active_joints = tree
+        self.selected_joints = tree
             .iter(DepthFirst, None)
-            .map(|n| active_joints.get(&n.id()).is_some())
+            .map(|n| selected_joints.get(&n.id()).is_some())
             .collect();
-        self.active_points = tree
+        self.selected_effectors = tree
             .iter(DepthFirst, None)
-            .map(|n| active_points.get(&n.id()).is_some())
+            .map(|n| selected_effectors.get(&n.id()).is_some())
             .collect();
         self.offsets = tree
             .iter(DepthFirst, None)
             .scan(0, |offset, node| {
                 let result = Some(*offset);
-                if active_points.get(&node.id()).is_some() {
+                if selected_effectors.get(&node.id()).is_some() {
                     *offset += node.get().effector_size();
                 }
                 result
@@ -84,7 +84,7 @@ impl Differentiable for VecJacobian {
             .collect();
 
         self.rows = self.offsets.iter().sum();
-        self.cols = self.active_joints.iter().filter(|&active| *active).count();
+        self.cols = self.selected_joints.iter().filter(|&selected| *selected).count();
 
         self.data.clear();
         self.data.resize(self.rows * self.cols, 0.0f64);
@@ -130,20 +130,25 @@ impl Differentiable for VecJacobian {
             .zip(
                 nodes_trafos
                     .iter()
-                    .zip(self.active_joints.iter()) // Add the active joint lists
-                    .filter_map(|(x, active)| if *active { Some(x) } else { None }), // filter inactive joints and remove flag
-                                                                                     // .par_iter()
+                    .zip(self.selected_joints.iter()) // Add the selected joint lists
+                    .filter_map(|(x, selected)| if *selected { Some(x) } else { None }), // filter inactive joints and remove flag
+                                                                                         // .par_iter()
             )
             .for_each(|(col, (idx, joint_node, joint_pose))| {
+                println!(
+                    "joint {:?}, children: {:?}, {idx}",
+                    joint_node.id(),
+                    tree.iter(DepthFirst, Some(joint_node)).map(|n| n.id()).collect_vec()
+                );
                 izip!(
                     tree.iter(DepthFirst, Some(joint_node)), // iterating over the child tree
                     // zipping the corresponding trafos (by skipping until the current node) and the offsets in the column
                     // Using the index here is ok, keeping an iterator is to hard (gets mutated in a different closure)
                     nodes_trafos.iter().skip(*idx).map(|(_, _, trafo)| trafo),
                     self.offsets.iter().skip(*idx),
-                    self.active_points.iter()
+                    self.selected_effectors.iter().skip(*idx)
                 )
-                .filter(|(_, _, _, active)| **active)
+                .filter(|(_, _, _, selected)| **selected)
                 .for_each(|(effector_node, effector_pose, offset, _)| {
                     println!(
                         "effector id: {:?}, joint id {:?}, col. index: {}..{}",

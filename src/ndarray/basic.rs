@@ -41,16 +41,17 @@ pub struct Bone {
     link: Array2<f64>,
     axis: Axis,
     mode: Mode,
-    id: usize, // TODO remove after debugging the Jacobian
+    // id: usize, // TODO remove after debugging the Jacobian
+    effector: Option<Array2<f64>>,
 }
 
 impl Bone {
-    pub fn new(from_parent: &Array2<f64>, axis: Axis, id: usize) -> Self {
+    pub fn new(from_parent: &Array2<f64>, axis: Axis, effector: Option<Array2<f64>>) -> Self {
         Self {
             link: from_parent.clone(),
             axis,
             mode: Mode::Position,
-            id,
+            effector,
         }
     }
 }
@@ -135,13 +136,15 @@ impl Rigid for Bone {
             Axis::Translation(array_base) => unimplemented!(),
         };
         let axis_global = joint_pose.dot(local_axis);
-        // .clone().slice(s![0..3]);
-        let lever = &joint_pose.slice(s![0..3, 3]) - &pose.slice(s![0..3, 3]);
 
-        println!(
-            "{} lever: {lever}, axis_global: {axis_global}, local_axis: {local_axis}",
-            self.id
-        );
+        // TODO can we avoid this clone?
+        let mut pose = pose.clone();
+        if let Some(effector) = &self.effector {
+            pose = pose.dot(effector);
+        }
+        let lever = &pose.slice(s![0..3, 3]) - &joint_pose.slice(s![0..3, 3]);
+
+        println!("lever: {lever}, axis_global: {axis_global}, local_axis: {local_axis}",);
         // let target = ArrayViewMut1::from(target_buffer);
         cross_3d::<Self::NodeId>(
             axis_global.slice(s![0..3]),
@@ -239,10 +242,10 @@ mod tests {
         let mut trafo = Bone::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
 
-        let link1 = Bone::new(&trafo, Axis::RotationZ, 1);
-        let link2 = Bone::new(&trafo, Axis::RotationZ, 2);
-        let link3 = Bone::new(&trafo, Axis::RotationZ, 3);
-        let link4 = Bone::new(&trafo, Axis::RotationZ, 4);
+        let link1 = Bone::new(&trafo, Axis::RotationZ, None);
+        let link2 = Bone::new(&trafo, Axis::RotationZ, None);
+        let link3 = Bone::new(&trafo, Axis::RotationZ, None);
+        let link4 = Bone::new(&trafo, Axis::RotationZ, None);
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
@@ -274,10 +277,10 @@ mod tests {
         let mut trafo = Bone::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
 
-        let link1 = Bone::new(&trafo, Axis::RotationZ, 0);
-        let link2 = Bone::new(&trafo, Axis::RotationZ, 1);
-        let link3 = Bone::new(&trafo, Axis::RotationZ, 2);
-        let link4 = Bone::new(&trafo, Axis::RotationZ, 3);
+        let link1 = Bone::new(&trafo, Axis::RotationZ, None);
+        let link2 = Bone::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+        let link3 = Bone::new(&trafo, Axis::RotationZ, None);
+        let link4 = Bone::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
@@ -299,6 +302,7 @@ mod tests {
                 "link4".to_string(),
             ]
             .into(),
+            // TODO automatically those that have an effector defined
             &["link2".to_string(), "link4".to_string()].into(),
         );
 
