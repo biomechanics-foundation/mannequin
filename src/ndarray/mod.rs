@@ -1,5 +1,6 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
 use crate::{Differentiable, MannequinError, Rigid, TreeIterable, VecJacobian};
+use ndarray::Order;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -26,7 +27,7 @@ impl Differentiable for Jacobian {
     fn jacobian(&self) -> Self::Data<'_> {
         let data = self.base.jacobian();
         let result = ArrayView1::<f64>::from(data.as_slice())
-            .into_shape_with_order((self.base.rows(), self.base.cols()))
+            .into_shape_with_order(((self.base.rows(), self.base.cols()), Order::ColumnMajor))
             .unwrap();
         result
     }
