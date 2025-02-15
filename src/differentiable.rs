@@ -2,13 +2,13 @@ use crate::{DepthFirst, Nodelike, Rigid, TransformationAccumulation, TreeIterabl
 use itertools::{izip, Itertools};
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
-use std::{collections::HashSet, hash::Hash};
+use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
 // TODO maybe make precision generic
 pub trait Differentiable {
     type Data<'a>
     where
-        Self: 'a;
+        Self: 'a; // https://github.com/rust-lang/rust/issues/87479
 
     /// returns a reference to the internal data type
     fn jacobian(&self) -> Self::Data<'_>;
@@ -19,12 +19,12 @@ pub trait Differentiable {
     where
         T: TreeIterable<R, I>,
         R: Rigid,
-        I: Eq + Clone + Hash;
+        I: Eq + Clone + Hash + Debug;
     fn compute<T, R, I>(&mut self, tree: &T, params: &[R::Parameter])
     where
         T: TreeIterable<R, I>,
         R: Rigid,
-        I: Eq + Clone + Hash; //, active_joints: &[bool], active_points: &[bool]);
+        I: Eq + Clone + Hash + Debug; //, active_joints: &[bool], active_points: &[bool]);
 
     /// provide a reference to the raw data and the dimensions of its axes (so first the major axis)
     fn data(&mut self) -> &mut [f64];
@@ -62,7 +62,7 @@ impl Differentiable for VecJacobian {
     where
         T: TreeIterable<R, I>,
         R: Rigid,
-        I: Eq + Clone + Hash,
+        I: Eq + Clone + Hash + Debug,
     {
         self.active_joints = tree
             .iter(DepthFirst, None)
@@ -106,7 +106,7 @@ impl Differentiable for VecJacobian {
     where
         T: TreeIterable<R, I>,
         R: Rigid,
-        I: Eq + Clone + Hash,
+        I: Eq + Clone + Hash + Debug,
     {
         // compute transformations only once
         let nodes_trafos = tree
@@ -115,6 +115,11 @@ impl Differentiable for VecJacobian {
             .enumerate()
             .map(|(idx, (node, trafo))| (idx, node, trafo)) // flatten
             .collect_vec();
+
+        println!(
+            "{:?}",
+            nodes_trafos.iter().map(|(i, n, t)| (i, n.id(), t)).collect_vec()
+        );
 
         // nomenclature (as in https://stats.stackexchange.com/a/588492): row-, column-, tube fibers
 
@@ -140,6 +145,13 @@ impl Differentiable for VecJacobian {
                 )
                 .filter(|(_, _, _, active)| **active)
                 .for_each(|(effector_node, effector_pose, offset, _)| {
+                    println!(
+                        "effector id: {:?}, joint id {:?}, col. index: {}..{}",
+                        effector_node.id(),
+                        joint_node.id(),
+                        offset,
+                        offset + effector_node.get().effector_size()
+                    );
                     // The slice of the colum is itself a column-first matrix
                     effector_node.get().partial_derivative(
                         effector_pose,

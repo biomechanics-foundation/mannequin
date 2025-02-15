@@ -2,6 +2,7 @@
 use crate::{Differentiable, MannequinError, Rigid, TreeIterable, VecJacobian};
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::hash::Hash;
 
 pub mod basic;
@@ -38,7 +39,7 @@ impl Differentiable for Jacobian {
     where
         T: TreeIterable<R, I>,
         R: Rigid,
-        I: Eq + Clone + Hash,
+        I: Eq + Clone + Hash + Debug,
     {
         self.base.setup(tree, active_joints, active_points)
     }
@@ -55,7 +56,7 @@ impl Differentiable for Jacobian {
     where
         T: TreeIterable<R, I>,
         R: Rigid,
-        I: Eq + Clone + Hash,
+        I: Eq + Clone + Hash + Debug,
     {
         self.base.compute(tree, params)
     }

@@ -2,6 +2,7 @@ use core::fmt;
 use itertools::Itertools;
 use std::{
     collections::{hash_map, HashMap},
+    fmt::Debug,
     hash::Hash,
     usize,
 };
@@ -169,7 +170,7 @@ impl<Load, NodeId> ArenaTree<Load, NodeId> {
 impl<Load, NodeId> TreeIterable<Load, NodeId> for ArenaTree<Load, NodeId>
 where
     Load: 'static + fmt::Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash,
+    NodeId: Eq + 'static + Clone + Hash + Debug,
 {
     type Node = ArenaNode<Load, NodeId>;
 

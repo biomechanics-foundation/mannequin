@@ -1,5 +1,5 @@
 //! Definition of the interfaces for tree iteration
-use std::hash::Hash;
+use std::{fmt::Debug, hash::Hash};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -52,9 +52,9 @@ pub trait Nodelike<Load, NodeId> {
 pub trait TreeIterable<Load, NodeId>
 where
     Load: PartialEq,
-    NodeId: Eq + Clone + Hash,
+    NodeId: Eq + Clone + Hash + Debug,
 {
-    type Node: 'static + Nodelike<Load, NodeId>; // cannot hold references
+    type Node: 'static + Nodelike<Load, NodeId> + Debug; // cannot hold references
 
     fn iter<'a, 'b>(&'a self, traversal: Order, root: Option<&Self::Node>) -> impl Iterator<Item = &'a Self::Node>
     where

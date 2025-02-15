@@ -1,6 +1,6 @@
 /*! Defines the payload carried by [Nodelike] in the context of kinematics/character animation */
 
-use std::hash::Hash;
+use std::{fmt::Debug, hash::Hash};
 
 use crate::Nodelike;
 
@@ -11,14 +11,14 @@ use crate::Nodelike;
 /// only need to implement this trait.
 pub trait Rigid: PartialEq {
     /// E.g., 4x4 matrix, (3x1, 3x3), quaternions ...
-    type Transformation: Clone;
+    type Transformation: Clone + Debug;
     /// Vec, \[f64;4\], ...
     type Point;
     /// typically joint positions (angles/extension), f64, \[f64,3\]
     type Parameter;
 
     // TODO Explain why this is defined on Rigid (the node) and not Mannequin (the tree) .. in short, otherwise this would be another generic and mannequin.rs would be unreadable because of trait bounds. This way it is quite elegant
-    type NodeId: Eq + Hash + Clone;
+    type NodeId: Eq + Hash + Clone + Debug;
 
     /// Get the Transformation from the parent taking the connecting joint into account
     fn transform(&self, params: &Self::Parameter) -> Self::Transformation;

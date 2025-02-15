@@ -12,7 +12,7 @@ use ndarray::prelude::*;
 use ndarray::{Array1, Array2};
 use std::default;
 
-use super::{cross_3d, invert_tranformation_4x4};
+use super::{cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4};
 
 // const XAXIS: Array1<f64> = array![1.0, 0.0, 0.0, 0.0, 0.0];
 
@@ -41,14 +41,16 @@ pub struct Bone {
     link: Array2<f64>,
     axis: Axis,
     mode: Mode,
+    id: usize, // TODO remove after debugging the Jacobian
 }
 
 impl Bone {
-    pub fn new(from_parent: &Array2<f64>, axis: Axis) -> Self {
+    pub fn new(from_parent: &Array2<f64>, axis: Axis, id: usize) -> Self {
         Self {
             link: from_parent.clone(),
             axis,
             mode: Mode::Position,
+            id,
         }
     }
 }
@@ -70,7 +72,17 @@ impl Rigid for Bone {
 
     fn transform(&self, param: &Self::Parameter) -> Self::Transformation {
         // TODO: this can be a reference
-        self.link.clone()
+        let joint = match self.axis {
+            Axis::RotationX => rotate_x_4x4(*param),
+            Axis::RotationY => rotate_y_4x4(*param),
+            Axis::RotationZ => rotate_z_4x4(*param),
+            Axis::Rotation(_) => todo!(),
+            Axis::TranslationX => todo!(),
+            Axis::TranslationY => todo!(),
+            Axis::TranslationZ => todo!(),
+            Axis::Translation(_) => todo!(),
+        };
+        self.link.dot(&joint)
     }
 
     fn globalize(&self, other: &Self::Point) -> Self::Point {
@@ -126,6 +138,10 @@ impl Rigid for Bone {
         // .clone().slice(s![0..3]);
         let lever = &joint_pose.slice(s![0..3, 3]) - &pose.slice(s![0..3, 3]);
 
+        println!(
+            "{} lever: {lever}, axis_global: {axis_global}, local_axis: {local_axis}",
+            self.id
+        );
         // let target = ArrayViewMut1::from(target_buffer);
         cross_3d::<Self::NodeId>(
             axis_global.slice(s![0..3]),
@@ -145,7 +161,7 @@ impl Rigid for Bone {
     // }
 }
 
-type LinkNodeId = <Bone as Rigid>::NodeId;
+pub type LinkNodeId = <Bone as Rigid>::NodeId;
 
 /// Specialization of a Forward Kinematics on an [ArenaTree]
 pub struct ForwardsKinematics {
@@ -223,10 +239,10 @@ mod tests {
         let mut trafo = Bone::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
 
-        let link1 = Bone::new(&trafo, Axis::RotationZ);
-        let link2 = Bone::new(&trafo, Axis::RotationZ);
-        let link3 = Bone::new(&trafo, Axis::RotationZ);
-        let link4 = Bone::new(&trafo, Axis::RotationZ);
+        let link1 = Bone::new(&trafo, Axis::RotationZ, 1);
+        let link2 = Bone::new(&trafo, Axis::RotationZ, 2);
+        let link3 = Bone::new(&trafo, Axis::RotationZ, 3);
+        let link4 = Bone::new(&trafo, Axis::RotationZ, 4);
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
@@ -258,10 +274,10 @@ mod tests {
         let mut trafo = Bone::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
 
-        let link1 = Bone::new(&trafo, Axis::RotationZ);
-        let link2 = Bone::new(&trafo, Axis::RotationZ);
-        let link3 = Bone::new(&trafo, Axis::RotationZ);
-        let link4 = Bone::new(&trafo, Axis::RotationZ);
+        let link1 = Bone::new(&trafo, Axis::RotationZ, 0);
+        let link2 = Bone::new(&trafo, Axis::RotationZ, 1);
+        let link3 = Bone::new(&trafo, Axis::RotationZ, 2);
+        let link4 = Bone::new(&trafo, Axis::RotationZ, 3);
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
