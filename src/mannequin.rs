@@ -4,7 +4,7 @@
  * realistic joints, muscle simulation, or classical inverse kinematics and obstacle avoidance.
  */
 
-use crate::{Order::DepthFirst, Rigid, TransformationAccumulation, TreeIterable};
+use crate::{Rigid, TreeIterable};
 use std::marker::PhantomData;
 
 /// Trait representing a stateful forward kinematics algoritm. For instance, it can represent a rigid body mannequin

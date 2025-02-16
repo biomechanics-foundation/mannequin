@@ -20,7 +20,7 @@ where
 {
     // TODO did not manage to over write the root nodes :(
     pub fn new(tree: &'a ArenaTree<T, N>, root: usize) -> Self {
-        let mut stack = Vec::with_capacity(tree.max_depth);
+        let stack = Vec::with_capacity(tree.max_depth);
         println!("Creating new depth-first iterator (slow)");
         DepthFirstIterator {
             tree,
@@ -59,6 +59,7 @@ where
 /// Iterator for a breadth-first iteration when the data is not already sorted accordingly
 
 pub struct BreadthFirstIterator<'a, T, NodeRef> {
+    #[allow(dead_code)]
     tree: &'a ArenaTree<T, NodeRef>,
 }
 

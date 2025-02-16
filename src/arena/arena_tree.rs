@@ -1,20 +1,13 @@
-use core::fmt;
-use itertools::Itertools;
-use std::{
-    collections::{hash_map, HashMap},
-    fmt::Debug,
-    hash::Hash,
-    usize,
-};
-
+use super::{BreadthFirstIterator, DepthFirstIterator};
 use crate::{
     utils::sort_by_indices,
     MannequinError, Nodelike,
     Order::{self, BreadthFirst, DepthFirst},
     TreeIterable,
 };
-
-use super::{BreadthFirstIterator, DepthFirstIterator};
+use core::fmt;
+use itertools::Itertools;
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 /// A node structure to be used in an arena allocated tree. Fields are used to speed up iteration
 #[derive(Debug)]
 pub struct ArenaNode<Load, NodeId> {
@@ -125,7 +118,7 @@ impl<Load, NodeId> ArenaTree<Load, NodeId> {
     /// make either deoth or breadth first traversal efficient (slow insertion). `None` indicates
     /// that the data will be unordered (fast insertion, slower traversal).
     pub fn with_capacity(capacity: usize) -> Self {
-        let mut nodes = Vec::with_capacity(capacity);
+        let nodes = Vec::with_capacity(capacity);
 
         ArenaTree {
             sorting: None,
@@ -164,6 +157,12 @@ impl<Load, NodeId> ArenaTree<Load, NodeId> {
                 .position(|i| *i == node.index)
                 .expect("Internal error. Could not find index!");
         });
+    }
+}
+
+impl<Load, NodeId> Default for ArenaTree<Load, NodeId> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -286,8 +285,6 @@ where
             }
             BreadthFirst => {
                 unimplemented!();
-                Self::update_child_indices(&mut self.nodes, self.breadh_first_cache.as_ref().unwrap());
-                sort_by_indices(&mut self.nodes, self.breadh_first_cache.take().unwrap());
             }
         }
         self.lookup.clear();

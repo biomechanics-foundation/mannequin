@@ -9,7 +9,7 @@ pub struct DummyBody {
     value: f64,
 }
 impl DummyBody {
-    fn new(value: f64) -> Self {
+    pub fn new(value: f64) -> Self {
         DummyBody { value }
     }
 }
@@ -34,15 +34,15 @@ impl Rigid for DummyBody {
         first + second
     }
 
-    fn globalize(&self, other: &Self::Point) -> Self::Point {
+    fn globalize(&self, _other: &Self::Point) -> Self::Point {
         todo!()
     }
 
-    fn localize(&self, other: &Self::Point) -> Self::Point {
+    fn localize(&self, _other: &Self::Point) -> Self::Point {
         todo!()
     }
 
-    fn invert(trafo: &Self::Transformation) -> Self::Transformation {
+    fn invert(_trafo: &Self::Transformation) -> Self::Transformation {
         todo!()
     }
 
@@ -56,10 +56,10 @@ impl Rigid for DummyBody {
 
     fn partial_derivative(
         &self,
-        pose: &Self::Transformation,
-        joint: &Self,
-        joint_pose: &Self::Transformation,
-        target_buffer: &mut [f64],
+        _pose: &Self::Transformation,
+        _joint: &Self,
+        _joint_pose: &Self::Transformation,
+        _target_buffer: &mut [f64],
     ) {
         todo!()
     }

@@ -1,18 +1,14 @@
 //! Implementation of traits as specializations for ArenaTree using ndarray
 #![allow(unused_variables)]
 
+use super::{cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4};
 use crate::{
-    accumulate, ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation,
-    TreeIterable,
+    ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation, TreeIterable,
 };
 use core::fmt;
 use itertools::Itertools;
-use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 use ndarray::{Array1, Array2};
-use std::default;
-
-use super::{cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4};
 
 // const XAXIS: Array1<f64> = array![1.0, 0.0, 0.0, 0.0, 0.0];
 
@@ -195,6 +191,7 @@ impl Forward<ArenaTree<Bone, LinkNodeId>, Bone> for ForwardsKinematics {
 }
 
 pub struct DifferentialIK {
+    #[allow(dead_code)]
     max_depth: usize,
 }
 
@@ -226,13 +223,9 @@ pub type BasicMannequin = Mannequin<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsK
 mod tests {
     use super::super::Jacobian;
     use super::{Axis, Bone, DifferentialIK, ForwardsKinematics, LinkNodeId};
-    use crate::{
-        ArenaTree, Differentiable, Forward, Nodelike, Order::DepthFirst, Rigid, TransformationAccumulation,
-        TreeIterable,
-    };
-    use itertools::{izip, Itertools};
+    use crate::{ArenaTree, Differentiable, Forward, Order::DepthFirst, Rigid, TreeIterable};
+    use itertools::Itertools;
     use ndarray::prelude::*;
-    use std::collections::HashSet;
 
     #[test]
     fn test_fk() {
@@ -311,90 +304,5 @@ mod tests {
         // let jacobian = ik.jacobian(&tree, array![0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
 
         println!("jacobian: {}", jacobian.jacobian());
-    }
-
-    #[test]
-    fn construct_jacobian_with_node_filter() {
-        fn ik<T>(tree: &T, params: &Array1<f64>, selected_joints: &HashSet<String>, selected_points: &HashSet<String>)
-        where
-            T: TreeIterable<Bone, LinkNodeId>,
-        {
-            let active_joints = tree
-                .iter(DepthFirst, None)
-                .map(|n| selected_joints.get(&n.id()).is_some())
-                .collect_vec();
-            let active_points = tree
-                .iter(DepthFirst, None)
-                .map(|n| selected_points.get(&n.id()).is_some())
-                .collect_vec();
-
-            // TODO need to convert 2D to this. or accept an iterator over an array view in `accumulate_transformations` (better!)
-
-            // compute transformations only once
-            let nodes_trafos = tree
-                .iter(DepthFirst, None)
-                .accumulate_transformations(params.as_slice().unwrap(), 42)
-                .enumerate()
-                .map(|(idx, (node, trafo))| (idx, node, trafo)) // flatten
-                .collect_vec();
-
-            let (m, n) = (selected_joints.len(), selected_points.len());
-            // I guess either column layout or the transpose if we want to go with the 3 trick
-            // now go with transpose
-            let mut jacobian = Array3::<f64>::zeros((m, n, 3));
-
-            // nomenclature (as in https://stats.stackexchange.com/a/588492): row-, column-, tube fibers
-
-            // TODO this does not jet respect multiple axes!
-            jacobian
-                .axis_iter_mut(Axis(0))
-                // .into_par_iter()
-                .zip(
-                    nodes_trafos
-                        .iter()
-                        .zip(active_joints.iter()) // Add the active joint lists
-                        .filter_map(|(x, active)| if *active { Some(x) } else { None }), // filter inactive joints and remove flag
-                                                                                         // .par_iter()
-                )
-                /* .Initially I wanted to iterate over the degrees of freedom, however each
-                axis should have its own `trafo` including the previous axis's tranformation
-                this makes it much more complex than anticipated.
-                Rather handle this internally. E.g. NodeID being a tuple data type of <string,usize> and implement hasfunction for this
-                map(|(idx, node, trafo)| ()),
-                That works! (surprisingly enough)
-                However, a 2D spline joint would be difficult to achieve (but doable with tuples of float as parameter type and a bit of duplication)
-                */
-                .for_each(|(mut row, (idx, joint_node, joint_trafo))| {
-                    izip!(
-                        tree.iter(DepthFirst, Some(joint_node)), // iterating over the child tree
-                        // zipping the corresponding trafos (by skipping until the current node)
-                        // Using the index here is ok, keeping an iterator is to hard (gets mutated in a different closure)
-                        nodes_trafos.iter().skip(*idx).map(|(_, _, trafo)| trafo),
-                        row.axis_iter_mut(Axis(0)),
-                        active_points.iter()
-                    )
-                    .filter(|(_, _, _, active)| **active)
-                    .for_each(|(point_node, point_trafo, mut tube, _)| {
-                        // joint_trafo^{-1} * point_trafo is the argument to compute the displacement
-                        tube.assign(&Array1::<f64>::zeros(3));
-                    });
-                });
-        }
-
-        let selected_joints = HashSet::<String>::new();
-        let selected_points = HashSet::<String>::new();
-
-        let tree = ArenaTree::<Bone, LinkNodeId>::new();
-
-        // TODO That's what I want to put in
-        let params = Array1::<f64>::ones(42);
-        ik(&tree, &params, &selected_joints, &selected_points);
-    }
-
-    #[test]
-    fn hash_tuple() {
-        let mut hs = HashSet::<(String, usize)>::new();
-
-        hs.insert(("Shoulder".to_string(), 1));
     }
 }

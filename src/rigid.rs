@@ -119,12 +119,4 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    use itertools::Itertools;
-
-    use crate::dummy::DummyBody;
-    use crate::*;
-
-    #[test]
-    fn smoke_test() {}
-}
+mod tests {}
