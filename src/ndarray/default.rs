@@ -1,7 +1,10 @@
-//! Implementation of traits as specializations for ArenaTree using ndarray
+//! "Default" imnplementation of a kinematics as encountered in robotics.
 #![allow(unused_variables)]
 
-use super::{cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4};
+use super::{
+    cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4, translate_x_4x4, translate_y_4x4,
+    translate_z_4x4,
+};
 use crate::{
     ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation, TreeIterable,
 };
@@ -9,8 +12,6 @@ use core::fmt;
 use itertools::Itertools;
 use ndarray::prelude::*;
 use ndarray::{Array1, Array2};
-
-// const XAXIS: Array1<f64> = array![1.0, 0.0, 0.0, 0.0, 0.0];
 
 #[derive(Debug, PartialEq, Default)]
 pub enum Axis {
@@ -37,7 +38,6 @@ pub struct Bone {
     link: Array2<f64>,
     axis: Axis,
     mode: Mode,
-    // id: usize, // TODO remove after debugging the Jacobian
     effector: Option<Array2<f64>>,
 }
 
@@ -68,15 +68,15 @@ impl Rigid for Bone {
     type NodeId = String;
 
     fn transform(&self, param: &Self::Parameter) -> Self::Transformation {
-        // TODO: this can be a reference
         let joint = match self.axis {
             Axis::RotationX => rotate_x_4x4(*param),
             Axis::RotationY => rotate_y_4x4(*param),
             Axis::RotationZ => rotate_z_4x4(*param),
+            // TODO implement arbitratry axis and translations
             Axis::Rotation(_) => todo!(),
-            Axis::TranslationX => todo!(),
-            Axis::TranslationY => todo!(),
-            Axis::TranslationZ => todo!(),
+            Axis::TranslationX => translate_x_4x4(*param),
+            Axis::TranslationY => translate_y_4x4(*param),
+            Axis::TranslationZ => translate_z_4x4(*param),
             Axis::Translation(_) => todo!(),
         };
         self.link.dot(&joint)
@@ -110,7 +110,11 @@ impl Rigid for Bone {
     }
 
     fn effector_count(&self) -> usize {
-        1
+        if self.effector.is_some() {
+            1
+        } else {
+            0
+        }
     }
 
     fn partial_derivative(
@@ -140,8 +144,6 @@ impl Rigid for Bone {
         }
         let lever = &pose.slice(s![0..3, 3]) - &joint_pose.slice(s![0..3, 3]);
 
-        println!("lever: {lever}, axis_global: {axis_global}, local_axis: {local_axis}",);
-        // let target = ArrayViewMut1::from(target_buffer);
         cross_3d::<Self::NodeId>(
             axis_global.slice(s![0..3]),
             lever.view(),
@@ -149,16 +151,9 @@ impl Rigid for Bone {
         )
         .unwrap();
     }
-    // fn partial_derivative(&self, joint: &Self::Transformation, local: &Self::Transformation, target: &mut [f64]) {
-    //     match self.mode {
-    //         Mode::Pose => {
-    //             let end_effector = local.slice(s![..3, 3]);
-    //             // TODO We need the axis of the joint .. i.e., the joint itself
-    //         }
-    //         Mode::Position => unimplemented!(),
-    //     }
-    // }
 }
+
+// TODO move solvers to dedicated module
 
 pub type LinkNodeId = <Bone as Rigid>::NodeId;
 
@@ -224,6 +219,7 @@ mod tests {
     use super::super::Jacobian;
     use super::{Axis, Bone, DifferentialIK, ForwardsKinematics, LinkNodeId};
     use crate::{ArenaTree, Differentiable, Forward, Order::DepthFirst, Rigid, TreeIterable};
+    use approx::assert_abs_diff_eq;
     use itertools::Itertools;
     use ndarray::prelude::*;
 
@@ -255,7 +251,7 @@ mod tests {
             &[ref2, ref3, ref4],
         );
         let res = res.iter().map(|el| el.slice(s![..3, 3]).to_vec()).collect_vec();
-        println!("{:?}", res);
+
         assert_eq!(
             res,
             vec![vec![20.0, 0.0, 0.0], vec![20.0, 0.0, 0.0], vec![20.0, 10.0, 0.0]]
@@ -299,10 +295,22 @@ mod tests {
             &["link2".to_string(), "link4".to_string()].into(),
         );
 
-        jacobian.compute(&tree, &[0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
+        jacobian.compute(
+            &tree,
+            &[0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2],
+        );
 
-        // let jacobian = ik.jacobian(&tree, array![0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
+        let target = array![
+            [0.0, 0.0, 0.0, 0.0],
+            [20.0, 10.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0,],
+            [-10.0, 0.0, -10.0, 0.0],
+            [0.0, 0.0, -10.0, -10.0],
+            [0.0, 0.0, 0.0, 0.0,]
+        ];
 
-        println!("jacobian: {}", jacobian.jacobian());
+        // println!("{}", &jacobian.jacobian() - &target);
+
+        assert_abs_diff_eq!(jacobian.jacobian(), target, epsilon = 1e-6);
     }
 }

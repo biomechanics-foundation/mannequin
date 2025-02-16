@@ -14,6 +14,7 @@ pub struct Jacobian {
     base: VecJacobian,
 }
 
+/// Thin wrapper around the default implementation
 impl Jacobian {
     pub fn new() -> Self {
         Self::default()

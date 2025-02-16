@@ -32,8 +32,9 @@ pub trait Differentiable {
     fn cols(&self) -> usize;
 }
 
-/// Base implementation that should be used in backend implementation as a composite
-/// Call methods in children like that: `<VecJacobian as Differentiable<T, R, I>>::compute`
+/// Base implementation that should be used in backend implementation as a composite.
+/// The composition of the Jacobian does not require a specific backend and can directly operate on
+/// a rust vector instead. All backends can operate on this structure without copying the data.
 #[derive(Debug, Default)]
 pub struct VecJacobian {
     data: Vec<f64>,
@@ -116,11 +117,6 @@ impl Differentiable for VecJacobian {
             .map(|(idx, (node, trafo))| (idx, node, trafo)) // flatten
             .collect_vec();
 
-        println!(
-            "{:?}",
-            nodes_trafos.iter().map(|(i, n, t)| (i, n.id(), t)).collect_vec()
-        );
-
         // nomenclature (as in https://stats.stackexchange.com/a/588492): row-, column-, tube fibers
 
         self.data
@@ -135,11 +131,6 @@ impl Differentiable for VecJacobian {
                                                                                          // .par_iter()
             )
             .for_each(|(col, (idx, joint_node, joint_pose))| {
-                println!(
-                    "joint {:?}, children: {:?}, {idx}",
-                    joint_node.id(),
-                    tree.iter(DepthFirst, Some(joint_node)).map(|n| n.id()).collect_vec()
-                );
                 izip!(
                     tree.iter(DepthFirst, Some(joint_node)), // iterating over the child tree
                     // zipping the corresponding trafos (by skipping until the current node) and the offsets in the column
@@ -150,13 +141,6 @@ impl Differentiable for VecJacobian {
                 )
                 .filter(|(_, _, _, selected)| **selected)
                 .for_each(|(effector_node, effector_pose, offset, _)| {
-                    println!(
-                        "effector id: {:?}, joint id {:?}, col. index: {}..{}",
-                        effector_node.id(),
-                        joint_node.id(),
-                        offset,
-                        offset + effector_node.get().effector_size()
-                    );
                     // The slice of the colum is itself a column-first matrix
                     effector_node.get().partial_derivative(
                         effector_pose,
