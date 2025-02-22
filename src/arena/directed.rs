@@ -11,34 +11,37 @@ use core::fmt;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct ArenaIndex(pub usize);
+
 /// A node structure to be used in an arena allocated tree. Fields are used to speed up iteration
 #[derive(Debug)]
 pub struct ArenaNode<Load, NodeId> {
     /// The user-defined load that the node owns
     pub(super) load: Load,
     /// Index in the arena allocation
-    pub(super) index: usize,
+    pub(super) index: ArenaIndex,
     /// identifier for lookups
     pub(super) id: NodeId,
     /// references for children
-    pub(super) children: Vec<usize>,
+    pub(super) children: Vec<ArenaIndex>,
     /// Used to optize sub-tree, depth-first traversal in [DepthFirstArenaTree]
     pub(super) width: usize,
     /// Depth in the tree
     depth: usize,
     /// Only used in [DirectedArenaTree]
-    parent_ref: Option<usize>,
+    parent_ref: Option<ArenaIndex>,
 }
 
 impl<Load, NodeRef> ArenaNode<Load, NodeRef> {
     fn new(
         payload: Load,
         node_ref: NodeRef,
-        index: usize,
+        index: ArenaIndex,
         width: usize,
-        children: Vec<usize>,
+        children: Vec<ArenaIndex>,
         depth: usize,
-        parent_ref: Option<usize>,
+        parent_ref: Option<ArenaIndex>,
     ) -> Self {
         ArenaNode {
             load: payload,
@@ -80,7 +83,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "NodeRef {}, children: {:?}, payload: {} ",
+            "Arena index {:?}, children: {:?}, payload: {} ",
             self.index, self.children, self.load
         )
     }
@@ -101,7 +104,7 @@ pub struct DirectedArenaTree<Load, NodeID> {
     pub(super) max_depth: usize,
 
     /// Lookup arena indices
-    pub(super) lookup: HashMap<NodeID, usize>,
+    pub(super) lookup: HashMap<NodeID, ArenaIndex>,
 }
 
 impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
@@ -135,18 +138,22 @@ impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
 
     /// Given an squenze of nodes (i.e., an areana), update the references to child nodes when
     /// the arena is reorderd. It takes a sequence of the same size with the new indices as a parameter
-    pub(super) fn update_child_indices(nodes: &mut [ArenaNode<Load, NodeId>], indices: &[usize]) {
+    pub(super) fn update_child_indices(nodes: &mut [ArenaNode<Load, NodeId>], indices: &[ArenaIndex]) {
         nodes.iter_mut().for_each(|node| {
             node.children.iter_mut().for_each(|child_ref| {
-                *child_ref = indices
-                    .iter()
-                    .position(|i| i == child_ref)
-                    .expect("Internal error. Could not find index!")
+                *child_ref = ArenaIndex(
+                    indices
+                        .iter()
+                        .position(|i| *i == *child_ref)
+                        .expect("Internal error. Could not find index!"),
+                )
             });
-            node.index = indices
-                .iter()
-                .position(|i| *i == node.index)
-                .expect("Internal error. Could not find index!");
+            node.index = ArenaIndex(
+                indices
+                    .iter()
+                    .position(|i| *i == node.index)
+                    .expect("Internal error. Could not find index!"),
+            );
         });
     }
 }
@@ -188,7 +195,7 @@ where
         // TODO Confirm code is still working
 
         let index = self.lookup.get(node_ref)?;
-        self.nodes.get(*index)
+        self.nodes.get(index.0)
 
         // self.nodes.iter().find(|node| node.id == *node_ref)
     }
@@ -204,7 +211,7 @@ where
     NodeId: Eq + 'static + Clone + Hash + Debug,
 {
     fn iter_depth(&self) -> impl Iterator<Item = &Self::Node> {
-        Box::new(DepthFirstIterator::new(self, 0))
+        Box::new(DepthFirstIterator::new(self, ArenaIndex(0)))
     }
 
     fn iter_depth_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node> {
@@ -212,7 +219,7 @@ where
     }
 
     fn iter_breadth(&self) -> impl Iterator<Item = &Self::Node> {
-        Box::new(BreadthFirstIterator::new(self, 0))
+        Box::new(BreadthFirstIterator::new(self, ArenaIndex(0)))
     }
 
     fn iter_breadth_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node> {
@@ -244,14 +251,14 @@ where
         let parent_index = parent.index;
         let mut parent = self
             .nodes
-            .get_mut(parent_index)
-            .ok_or(MannequinError::ReferenceOutOfBound(parent_index))?;
+            .get_mut(parent_index.0)
+            .ok_or(MannequinError::ReferenceOutOfBound(parent_index.0))?;
 
         // * Get the new node's depth
         // * update the parent's width and add the node as a child
         // * Add the node to the root list if it does not have a parent
 
-        parent.children.push(index);
+        parent.children.push(ArenaIndex(index));
 
         let depth = parent.depth + 1;
         parent.width += 1;
@@ -260,17 +267,17 @@ where
         while let Some(parent_ref) = parent.parent_ref {
             parent = self
                 .nodes
-                .get_mut(parent_ref)
-                .ok_or(MannequinError::ReferenceOutOfBound(parent_ref))?;
+                .get_mut(parent_ref.0)
+                .ok_or(MannequinError::ReferenceOutOfBound(parent_ref.0))?;
             parent.width += 1;
         }
 
-        self.lookup.insert(node_ref.clone(), index);
+        self.lookup.insert(node_ref.clone(), ArenaIndex(index));
         // Finally, add the node
         self.nodes.push(ArenaNode::new(
             load,
             node_ref,
-            index,
+            ArenaIndex(index),
             1,
             vec![],
             depth,
@@ -286,9 +293,9 @@ where
 
     fn set_root(&mut self, root_load: Load, root_ref: NodeId) -> NodeId {
         self.nodes.clear();
-        let root = ArenaNode::<Load, NodeId>::new(root_load, root_ref.clone(), 0, 1, vec![], 0, None);
+        let root = ArenaNode::<Load, NodeId>::new(root_load, root_ref.clone(), ArenaIndex(0), 1, vec![], 0, None);
         self.nodes.push(root);
-        self.lookup.insert(root_ref, 0);
+        self.lookup.insert(root_ref, ArenaIndex(0));
         self.nodes[0].id.clone()
     }
 }
@@ -299,7 +306,7 @@ pub struct BreadthFirstIterator<'a, T, NodeRef> {
 }
 
 impl<'a, T, NodeRef> BreadthFirstIterator<'a, T, NodeRef> {
-    pub fn new(tree: &'a DirectedArenaTree<T, NodeRef>, _root: usize) -> Self {
+    pub fn new(tree: &'a DirectedArenaTree<T, NodeRef>, _root: ArenaIndex) -> Self {
         BreadthFirstIterator { tree }
     }
 }
@@ -317,8 +324,8 @@ where
     T: 'static + fmt::Debug + PartialEq,
 {
     tree: &'a DirectedArenaTree<T, N>,
-    stack: Vec<std::slice::Iter<'b, usize>>,
-    root: Option<usize>,
+    stack: Vec<std::slice::Iter<'b, ArenaIndex>>,
+    root: Option<ArenaIndex>,
 }
 
 impl<'a, T, N> DepthFirstIterator<'a, '_, T, N>
@@ -326,7 +333,7 @@ where
     T: 'static + fmt::Debug + PartialEq,
 {
     // TODO did not manage to over write the root nodes :(
-    pub fn new(tree: &'a DirectedArenaTree<T, N>, root: usize) -> Self {
+    pub fn new(tree: &'a DirectedArenaTree<T, N>, root: ArenaIndex) -> Self {
         let stack = Vec::with_capacity(tree.max_depth);
         println!("Creating new depth-first iterator (slow)");
         DepthFirstIterator {
@@ -343,16 +350,16 @@ where
     type Item = &'a ArenaNode<T, N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(root) = self.root {
-            let root = &self.tree.nodes[root];
+        if let Some(root) = &self.root {
+            let root = &self.tree.nodes[root.0];
             self.stack.push(root.children.iter());
             self.root = None;
             Some(root)
         } else if let Some(last) = self.stack.last_mut() {
             if let Some(child_ref) = last.next() {
-                let node = &self.tree.nodes[*child_ref];
+                let node = &self.tree.nodes[child_ref.0];
                 self.stack.push(node.children.iter());
-                Some(&self.tree.nodes[*child_ref])
+                Some(&self.tree.nodes[child_ref.0])
             } else {
                 self.stack.pop();
                 self.next()

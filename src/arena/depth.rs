@@ -80,12 +80,12 @@ where
 {
     fn iter_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node> {
         let (start, width) = (root.index, root.width);
-        self.0.nodes[start..start + width].iter()
+        self.0.nodes[start.0..start.0 + width].iter()
     }
 
     fn iter_sub_mut(&mut self, root: &Self::Node) -> impl Iterator<Item = &mut Self::Node> {
         let (start, width) = (root.index, root.width);
-        self.0.nodes[start..start + width].iter_mut()
+        self.0.nodes[start.0..start.0 + width].iter_mut()
     }
 }
 
@@ -155,6 +155,7 @@ mod tests {
 
     use super::*;
     use crate::*;
+    use arena::directed::ArenaIndex;
     use itertools::Itertools;
     use test_log;
 
@@ -205,10 +206,10 @@ mod tests {
         );
 
         // Check correctness of child references for two nodes
-        assert_eq!(tree.nodes()[0].children, &[1, 2]);
-        assert_eq!(tree.nodes()[1].children, &[3, 4]);
-        assert_eq!(tree.nodes()[2].children, &[6]);
-        assert_eq!(tree.nodes()[3].children, &[5]);
+        assert_eq!(tree.nodes()[0].children, &[ArenaIndex(1), ArenaIndex(2)]);
+        assert_eq!(tree.nodes()[1].children, &[ArenaIndex(3), ArenaIndex(4)]);
+        assert_eq!(tree.nodes()[2].children, &[ArenaIndex(6)]);
+        assert_eq!(tree.nodes()[3].children, &[ArenaIndex(5)]);
 
         // // Example of how to print the hierachy
         // tree.nodes
@@ -220,10 +221,10 @@ mod tests {
         let tree: DepthFirstArenaTree<usize, String> = tree.into();
 
         // Check correctness of child references for two nodes
-        assert_eq!(tree.0.nodes[0].children, &[1, 5]);
-        assert_eq!(tree.0.nodes[1].children, &[2, 4]);
-        assert_eq!(tree.0.nodes[2].children, &[3]);
-        assert_eq!(tree.0.nodes[5].children, &[6]);
+        assert_eq!(tree.0.nodes[0].children, &[ArenaIndex(1), ArenaIndex(5)]);
+        assert_eq!(tree.0.nodes[1].children, &[ArenaIndex(2), ArenaIndex(4)]);
+        assert_eq!(tree.0.nodes[2].children, &[ArenaIndex(3)]);
+        assert_eq!(tree.0.nodes[5].children, &[ArenaIndex(6)]);
 
         // check correctness of storage
         assert_eq!(
@@ -234,7 +235,15 @@ mod tests {
         // Check whether indices are stored correctly
         assert_eq!(
             tree.0.nodes.iter().map(|n| n.index).collect_vec(),
-            &[0, 1, 2, 3, 4, 5, 6]
+            &[
+                ArenaIndex(0),
+                ArenaIndex(1),
+                ArenaIndex(2),
+                ArenaIndex(3),
+                ArenaIndex(4),
+                ArenaIndex(5),
+                ArenaIndex(6)
+            ]
         );
 
         assert_eq!(
