@@ -32,7 +32,7 @@ pub mod utils;
 
 pub use arena::{ArenaNode, DirectedArenaTree};
 pub use differentiable::{Differentiable, VecJacobian};
-pub use iterables::{BreadthFirstIterable, DepthFirstIterable, DirectionIterable, MannequinError, Nodelike, Order};
+pub use iterables::{BreadthFirstIterable, DepthFirstIterable, DirectionIterable, MannequinError, Nodelike};
 pub use mannequin::{Forward, Inverse, Mannequin};
 pub use rigid::{accumulate, Rigid, TransformationAccumulation};
 

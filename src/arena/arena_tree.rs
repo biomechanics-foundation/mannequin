@@ -1,5 +1,10 @@
 use super::{BreadthFirstIterator, DepthFirstIterator};
-use crate::{iterables::BaseDirectionIterable, utils::sort_by_indices, DirectionIterable, MannequinError, Nodelike};
+use crate::{
+    iterables::{BaseDirectionIterable, OptimizedDirectionIterable},
+    utils::sort_by_indices,
+    BreadthFirstIterable, DepthFirstIterable, DirectionIterable, MannequinError, Nodelike,
+};
+
 use core::fmt;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
@@ -93,11 +98,10 @@ pub struct DirectedArenaTree<Load, NodeID> {
     /// Memory allocated area for nodes
     pub(crate) nodes: Vec<ArenaNode<Load, NodeID>>,
 
-    /// Caches the sequence of iteration (depth-first)
-    depth_first_cache: Option<Vec<usize>>,
-    /// Caches the sequence of iteration (breadth-first)
-    breadh_first_cache: Option<Vec<usize>>,
-
+    // /// Caches the sequence of iteration (depth-first)
+    // depth_first_cache: Option<Vec<usize>>,
+    // /// Caches the sequence of iteration (breadth-first)
+    // breadh_first_cache: Option<Vec<usize>>,
     /// Maximal recursion depth of the dree
     pub(crate) max_depth: usize,
 
@@ -113,8 +117,8 @@ impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
 
         DirectedArenaTree {
             nodes,
-            depth_first_cache: None,
-            breadh_first_cache: None,
+            // depth_first_cache: None,
+            // breadh_first_cache: None,
             max_depth: 42,
             lookup: HashMap::with_capacity(capacity),
         }
@@ -126,13 +130,15 @@ impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
     pub fn new() -> Self {
         DirectedArenaTree {
             nodes: vec![],
-            depth_first_cache: None,
-            breadh_first_cache: None,
+            // depth_first_cache: None,
+            // breadh_first_cache: None,
             max_depth: 42,
             lookup: HashMap::new(),
         }
     }
 
+    /// Given an squenze of nodes (i.e., an areana), update the references to child nodes when
+    /// the arena is reorderd. It takes a sequence of the same size with the new indices as a parameter
     fn update_child_indices(nodes: &mut [ArenaNode<Load, NodeId>], indices: &[usize]) {
         nodes.iter_mut().for_each(|node| {
             node.children.iter_mut().for_each(|child_ref| {
@@ -182,13 +188,17 @@ where
     }
 
     fn node_by_id(&self, node_ref: &NodeId) -> Option<&Self::Node> {
-        // A hashmap is be faster: O(1)!
+        // A hashmap is be faster: O(1)
         // TODO Confirm code is still working
 
         let index = self.lookup.get(node_ref)?;
         self.nodes.get(*index)
 
         // self.nodes.iter().find(|node| node.id == *node_ref)
+    }
+
+    fn nodes(&self) -> &[Self::Node] {
+        &self.nodes
     }
 }
 
@@ -198,63 +208,31 @@ where
     NodeId: Eq + 'static + Clone + Hash + Debug,
 {
     fn iter_depth(&self) -> impl Iterator<Item = &Self::Node> {
-        todo!()
+        Box::new(DepthFirstIterator::new(self, 0))
     }
 
     fn iter_depth_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node> {
-        todo!()
+        Box::new(DepthFirstIterator::new(self, root.index))
     }
 
     fn iter_breadth(&self) -> impl Iterator<Item = &Self::Node> {
-        todo!()
+        Box::new(BreadthFirstIterator::new(self, 0))
     }
 
     fn iter_breadth_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node> {
-        todo!()
+        Box::new(BreadthFirstIterator::new(self, root.index))
     }
 
-    fn to_depth_first(self) -> impl crate::DepthFirstIterable<Load, NodeId> {
-        todo!()
+    fn depth_first(self) -> impl crate::DepthFirstIterable<Load, NodeId> {
+        let result: DepthFirstArenaTree<Load, NodeId> = self.into();
+        result
     }
 
-    fn to_breadth_first(self) -> impl crate::BreadthFirstIterable<Load, NodeId> {
-        todo!()
-    }
-
-    // #[allow(refining_impl_trait)]
-    // fn iter<'a, 'b>(
-    //     &'a self,
-    //     traversal: Order,
-    //     root: Option<&Self::Node>,
-    // ) -> Box<dyn Iterator<Item = &'a Self::Node> + 'b>
-    // where
-    //     'a: 'b, //  tree outlives the iterator
-    // {
-    //     let (start, width) = if let Some(root) = root {
-    //         (root.index, root.width)
-    //     } else {
-    //         (0, self.nodes.len())
-    //     };
-
-    //     match (self.sorting, traversal) {
-    //         // (Some(a), b) if a == b => Box::new(self.nodes.iter()), // Big Todo: skip_while and take_while
-    //         (Some(a), b) if a == b => Box::new(self.nodes.iter().skip(start).take(width)), // Big Todo: skip_while and take_while
-    //         (_, DepthFirst) => {
-    //             // TODO use the depth_first_cache
-    //             Box::new(DepthFirstIterator::new(self, 0))
-    //         }
-    //         (_, BreadthFirst) => {
-    //             // TODO use the breadth_first_cache
-    //             Box::new(BreadthFirstIterator::new(self))
-    //         }
-    //     }
+    // fn breadth_first(self) -> impl crate::BreadthFirstIterable<Load, NodeId> {
+    //     unimplemented!();
     // }
 
     fn add(&mut self, load: Load, node_ref: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>> {
-        self.breadh_first_cache = None;
-        self.depth_first_cache = None;
-        self.sorting = None;
-
         let parent = self
             .node_by_id(parent)
             .ok_or(MannequinError::UnkonwnNode(parent.clone()))?;
@@ -310,37 +288,6 @@ where
         Ok(self.nodes.last().unwrap().id.clone())
     }
 
-    // fn optimize(&mut self, for_traversal: Order) {
-    //     // populate caches usually with the iterators.
-    //     self.depth_first_cache = Some(self.iter(DepthFirst, None).map(|node| node.index).collect_vec());
-
-    //     // TODO not implemented yet
-    //     // self.breadh_first_cache = Some(
-    //     //     self.iter(BreadthFirst, &self.roots)
-    //     //         .map(|node| node.node_ref)
-    //     //         .collect_vec(),
-    //     // );
-
-    //     // update roots before
-
-    //     // reorder the node list and update references
-    //     self.sorting = Some(for_traversal);
-
-    //     match for_traversal {
-    //         DepthFirst => {
-    //             Self::update_child_indices(&mut self.nodes, self.depth_first_cache.as_ref().unwrap());
-    //             sort_by_indices(&mut self.nodes, self.depth_first_cache.take().unwrap());
-    //         }
-    //         BreadthFirst => {
-    //             unimplemented!();
-    //         }
-    //     }
-    //     self.lookup.clear();
-    //     self.nodes.iter().for_each(|node| {
-    //         self.lookup.insert(node.id.clone(), node.index);
-    //     });
-    // }
-
     fn set_root(&mut self, root_load: Load, root_ref: NodeId) -> NodeId {
         self.nodes.clear();
         let root = ArenaNode::<Load, NodeId>::new(root_load, root_ref.clone(), 0, 1, vec![], 0, None);
@@ -350,12 +297,97 @@ where
     }
 }
 
+pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>);
+
+impl<Load, NodeId> From<DirectedArenaTree<Load, NodeId>> for DepthFirstArenaTree<Load, NodeId>
+where
+    Load: 'static + fmt::Debug + PartialEq,
+    NodeId: Eq + 'static + Clone + Hash + Debug,
+{
+    fn from(mut value: DirectedArenaTree<Load, NodeId>) -> Self {
+        // sorts the order of nodes such that depth-first decent is optimal
+
+        let optimal_order = value.iter_depth().map(|node| node.index).collect_vec();
+
+        DirectedArenaTree::update_child_indices(&mut value.nodes, &optimal_order);
+        sort_by_indices(&mut value.nodes, optimal_order);
+
+        value.nodes.iter().for_each(|node| {
+            value.lookup.insert(node.id.clone(), node.index);
+        });
+        Self(value)
+    }
+}
+
+impl<Load, NodeId> BaseDirectionIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
+where
+    Load: 'static + fmt::Debug + PartialEq,
+    NodeId: Eq + 'static + Clone + Hash + Debug,
+{
+    type Node = ArenaNode<Load, NodeId>;
+
+    fn root(&self) -> Result<&Self::Node, MannequinError<NodeId>> {
+        self.0.root()
+    }
+
+    fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>> {
+        self.0.children(node)
+    }
+
+    fn node_by_load(&self, load: &Load) -> Option<&Self::Node> {
+        self.0.node_by_load(load)
+    }
+
+    fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node> {
+        self.0.node_by_id(node_id)
+    }
+
+    fn nodes(&self) -> &[Self::Node] {
+        self.0.nodes()
+    }
+}
+
+impl<Load, NodeId> OptimizedDirectionIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
+where
+    Load: 'static + fmt::Debug + PartialEq,
+    NodeId: Eq + 'static + Clone + Hash + Debug,
+{
+    fn iter(&self) -> impl Iterator<Item = &Self::Node> {
+        self.0.nodes.iter()
+    }
+
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Node> {
+        self.0.nodes.iter_mut()
+    }
+}
+
+impl<Load, NodeId> DepthFirstIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
+where
+    Load: 'static + fmt::Debug + PartialEq,
+    NodeId: Eq + 'static + Clone + Hash + Debug,
+{
+    fn iter_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node> {
+        let (start, width) = (root.index, root.width);
+        self.0.nodes[start..start + width].iter()
+    }
+
+    fn iter_sub_mut(&mut self, root: &Self::Node) -> impl Iterator<Item = &mut Self::Node> {
+        let (start, width) = (root.index, root.width);
+        self.0.nodes[start..start + width].iter_mut()
+    }
+}
+
+struct BreaddthFirstArenaTree {}
+
 #[cfg(test)]
 mod tests {
 
+    use arena::arena_tree::DepthFirstArenaTree;
+    use iterables::BaseDirectionIterable;
     use itertools::Itertools;
     use test_log;
 
+    use crate::iterables::OptimizedDirectionIterable;
     use crate::*;
 
     #[test_log::test]
@@ -394,9 +426,9 @@ mod tests {
         );
 
         // This uses the depth slow first iterator!
-        let result = tree.iter(DepthFirst, None).map(|i| *i.get()).collect_vec();
+        let result = tree.iter_depth().map(|i| *i.get()).collect_vec();
         assert_eq!(result, &[0, 1, 2, 3, 4, 5, 6]);
-        let result = tree.iter(DepthFirst, None).map(|i| &i.id).collect_vec();
+        let result = tree.iter_depth().map(|i| i.id()).collect_vec();
 
         // Check whether iteration is not in the same order as insertion and matches the expectation
         assert_eq!(
@@ -405,10 +437,10 @@ mod tests {
         );
 
         // Check correctness of child references for two nodes
-        assert_eq!(tree.nodes[0].children, &[1, 2]);
-        assert_eq!(tree.nodes[1].children, &[3, 4]);
-        assert_eq!(tree.nodes[2].children, &[6]);
-        assert_eq!(tree.nodes[3].children, &[5]);
+        assert_eq!(tree.nodes()[0].children, &[1, 2]);
+        assert_eq!(tree.nodes()[1].children, &[3, 4]);
+        assert_eq!(tree.nodes()[2].children, &[6]);
+        assert_eq!(tree.nodes()[3].children, &[5]);
 
         // // Example of how to print the hierachy
         // tree.nodes
@@ -417,62 +449,51 @@ mod tests {
         // .for_each(|(i, n)| println!("{i}.: id: {}, load: {}, children {:?}", n.id, n.load, n.children));
 
         // Optimize the tree such that the nodes are sorted in depth-frist manner
-        tree.optimize(DepthFirst);
+        let tree: DepthFirstArenaTree<usize, String> = tree.into();
 
         // Check correctness of child references for two nodes
-        assert_eq!(tree.nodes[0].children, &[1, 5]);
-        assert_eq!(tree.nodes[1].children, &[2, 4]);
-        assert_eq!(tree.nodes[2].children, &[3]);
-        assert_eq!(tree.nodes[5].children, &[6]);
+        assert_eq!(tree.0.nodes[0].children, &[1, 5]);
+        assert_eq!(tree.0.nodes[1].children, &[2, 4]);
+        assert_eq!(tree.0.nodes[2].children, &[3]);
+        assert_eq!(tree.0.nodes[5].children, &[6]);
 
         // check correctness of storage
-        assert_eq!(tree.nodes.iter().map(|n| n.load).collect_vec(), &[0, 1, 2, 3, 4, 5, 6]);
+        assert_eq!(
+            tree.0.nodes.iter().map(|n| n.load).collect_vec(),
+            &[0, 1, 2, 3, 4, 5, 6]
+        );
 
         // Check whether indices are stored correctly
-        assert_eq!(tree.nodes.iter().map(|n| n.index).collect_vec(), &[0, 1, 2, 3, 4, 5, 6]);
+        assert_eq!(
+            tree.0.nodes.iter().map(|n| n.index).collect_vec(),
+            &[0, 1, 2, 3, 4, 5, 6]
+        );
 
         assert_eq!(
-            tree.nodes.iter().map(|n| &n.id).collect_vec(),
+            tree.0.nodes.iter().map(|n| &n.id).collect_vec(),
             &["root", "first", "third", "fifth", "fourth", "second", "sixth"]
         );
 
         // Check whether the widths are computed correctly
-        let result = tree.nodes.iter().map(|n| n.width).collect_vec();
+        let result = tree.0.nodes.iter().map(|n| n.width).collect_vec();
         assert_eq!(result, &[7, 4, 2, 1, 1, 2, 1]);
 
         // Now we can safely immutably borrow the node
         let first_node = tree.node_by_id(&first).unwrap();
 
         // Now check whether iterating over subtrees work
-        let result = tree.iter(DepthFirst, Some(first_node)).map(|i| *i.get()).collect_vec();
+        let result = tree.iter_sub(first_node).map(|i| *i.get()).collect_vec();
         assert_eq!(result, &[1, 2, 3, 4]);
         let second_node = tree.node_by_id(&second).unwrap();
 
-        let result = tree.iter(DepthFirst, Some(second_node)).map(|i| *i.get()).collect_vec();
+        let result = tree.iter_sub(second_node).map(|i| *i.get()).collect_vec();
         assert_eq!(result, &[5, 6]);
 
         // TODO Check whether bread-first works (this will already use the cache as optimize has been called)
     }
 
-    // TODO add unit test for a `Box`ed node load
     #[test]
-    fn test_boxed() {
-        // let mut tree = ArenaTree::<Box<usize>>::new();
-        // let first = tree.add(Box::new(1), None).unwrap();
-        // // Add the second root first to see whether resorting of the vector works
-        // let second = tree.add(Box::new(5), None).unwrap();
-        // let third = tree.add(Box::new(2), Some(first)).unwrap();
-        // tree.add(Box::new(4), Some(first)).unwrap();
-        // tree.add(Box::new(3), Some(third)).unwrap();
-        // tree.add(Box::new(6), Some(second)).unwrap();
-
-        // // This uses the depth first iterator!
-        // let result = tree
-        //     .iter(DepthFirst, &[first, second])
-        //     // TODO check whether the clone is a problem or not.
-        //     .map(|i| i.get().as_ref())
-        //     .copied()
-        //     .collect_vec();
-        // assert_eq!(result, &[1, 2, 3, 4, 5, 6]);
+    fn test_iter_mut() {
+        // TODO implement test for mutable iteration
     }
 }

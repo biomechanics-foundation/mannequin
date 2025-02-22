@@ -61,11 +61,12 @@ where
 pub struct BreadthFirstIterator<'a, T, NodeRef> {
     #[allow(dead_code)]
     tree: &'a DirectedArenaTree<T, NodeRef>,
+    root: Option<usize>,
 }
 
 impl<'a, T, NodeRef> BreadthFirstIterator<'a, T, NodeRef> {
-    pub fn new(tree: &'a DirectedArenaTree<T, NodeRef>) -> Self {
-        BreadthFirstIterator { tree }
+    pub fn new(tree: &'a DirectedArenaTree<T, NodeRef>, root: usize) -> Self {
+        BreadthFirstIterator { tree, root: Some(root) }
     }
 }
 impl<'a, T, NodeRef> Iterator for BreadthFirstIterator<'a, T, NodeRef> {

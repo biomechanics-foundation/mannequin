@@ -56,6 +56,7 @@ where
     fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>>;
     fn node_by_load(&self, load: &Load) -> Option<&Self::Node>;
     fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node>;
+    fn nodes(&self) -> &[Self::Node];
 }
 
 /// A datastructure to hold a tree hierarchy of data contained in `NodeLike`s.
@@ -80,18 +81,18 @@ where
     fn set_root(&mut self, root_load: Load, root_ref: NodeId) -> NodeId;
 
     /// Generate optimized
-    fn to_depth_first(self) -> impl DepthFirstIterable<Load, NodeId>;
-    fn to_breadth_first(self) -> impl BreadthFirstIterable<Load, NodeId>;
+    fn depth_first(self) -> impl DepthFirstIterable<Load, NodeId>;
+    // fn breadth_first(self) -> impl BreadthFirstIterable<Load, NodeId>;
 }
 
 // TODO do we need an intermediate trait? Yes, if we want to avoid duplication and have separate traits for depth-/breadth-frist. No, if we don't need those two
-trait OptimizedDirectionIterable<Load, NodeId>: BaseDirectionIterable<Load, NodeId>
+pub(crate) trait OptimizedDirectionIterable<Load, NodeId>: BaseDirectionIterable<Load, NodeId>
 where
     Load: PartialEq,
     NodeId: Eq + Clone + Hash + Debug,
 {
     fn iter(&self) -> impl Iterator<Item = &Self::Node>;
-    fn iter_mut(&self) -> impl Iterator<Item = &mut Self::Node>;
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Node>;
 }
 
 pub trait DepthFirstIterable<Load, NodeId>: OptimizedDirectionIterable<Load, NodeId>
@@ -100,7 +101,7 @@ where
     NodeId: Eq + Clone + Hash + Debug,
 {
     fn iter_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node>;
-    fn iter_sub_mut(&self, root: &Self::Node) -> impl Iterator<Item = &mut Self::Node>;
+    fn iter_sub_mut(&mut self, root: &Self::Node) -> impl Iterator<Item = &mut Self::Node>;
 }
 
 pub trait BreadthFirstIterable<Load, NodeId>: OptimizedDirectionIterable<Load, NodeId>

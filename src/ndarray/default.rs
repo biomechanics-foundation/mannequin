@@ -5,10 +5,9 @@ use super::{
     cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4, translate_x_4x4, translate_y_4x4,
     translate_z_4x4,
 };
-use crate::{
-    DepthFirst, DirectedArenaTree, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation,
-    TreeIterable,
-};
+use crate::arena::arena_tree::DepthFirstArenaTree;
+use crate::iterables::OptimizedDirectionIterable;
+use crate::{DirectedArenaTree, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation};
 use core::fmt;
 use itertools::Itertools;
 use ndarray::prelude::*;
@@ -162,18 +161,18 @@ pub type LinkNodeId = <Bone as Rigid>::NodeId;
 pub struct ForwardsKinematics {
     max_depth: usize,
 }
-impl Forward<DirectedArenaTree<Bone, LinkNodeId>, Bone> for ForwardsKinematics {
+impl Forward<DepthFirstArenaTree<Bone, LinkNodeId>, Bone> for ForwardsKinematics {
     type Parameter = Array1<f64>;
 
     type Transformation = Array2<f64>;
 
     fn solve(
         &mut self,
-        tree: &DirectedArenaTree<Bone, LinkNodeId>,
+        tree: &DepthFirstArenaTree<Bone, LinkNodeId>,
         params: Self::Parameter,
         target_refs: &[LinkNodeId],
     ) -> Vec<Self::Transformation> {
-        tree.iter(DepthFirst, None)
+        tree.iter()
             .accumulate_transformations(params.as_slice().unwrap(), self.max_depth)
             .filter_map(|(node, trafo)| {
                 if target_refs.is_empty() || target_refs.contains(&node.id()) {
@@ -191,19 +190,20 @@ pub struct DifferentialIK {
     max_depth: usize,
 }
 
+// TODO: Keep generic
 pub type DifferentialIKParameter =
     <DifferentialIK as Inverse<DirectedArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics>>::Parameter;
 pub type DifferentialIKArray =
     <DifferentialIK as Inverse<DirectedArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics>>::Array;
 
-impl Inverse<DirectedArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics> for DifferentialIK {
+impl Inverse<DepthFirstArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics> for DifferentialIK {
     type Parameter = Array1<f64>;
 
     type Array = Array2<f64>;
 
     fn solve(
         &mut self,
-        tree: &DirectedArenaTree<Bone, LinkNodeId>,
+        tree: &DepthFirstArenaTree<Bone, LinkNodeId>,
         fk: &ForwardsKinematics,
         param: Self::Parameter,
         target_refs: &[LinkNodeId],
@@ -219,7 +219,9 @@ pub type BasicMannequin = Mannequin<DirectedArenaTree<Bone, LinkNodeId>, Bone, F
 mod tests {
     use super::super::Jacobian;
     use super::{Axis, Bone, DifferentialIK, ForwardsKinematics, LinkNodeId};
-    use crate::{Differentiable, DirectedArenaTree, Forward, Order::DepthFirst, Rigid, TreeIterable};
+    use crate::arena::arena_tree::DepthFirstArenaTree;
+    use crate::DirectionIterable;
+    use crate::{Differentiable, DirectedArenaTree, Forward, Rigid};
     use approx::assert_abs_diff_eq;
     use itertools::Itertools;
     use ndarray::prelude::*;
@@ -244,7 +246,7 @@ mod tests {
         let ref3 = tree.add(link3, "link3".to_string(), &ref1).unwrap();
         let ref4 = tree.add(link4, "link4".to_string(), &ref3).unwrap();
 
-        tree.optimize(DepthFirst);
+        let tree: DepthFirstArenaTree<_, _> = tree.into();
 
         let res = fk.solve(
             &tree,
@@ -280,7 +282,7 @@ mod tests {
         let ref3 = tree.add(link3, "link3".to_string(), &ref1).unwrap();
         let ref4 = tree.add(link4, "link4".to_string(), &ref3).unwrap();
 
-        tree.optimize(DepthFirst);
+        let tree: DepthFirstArenaTree<_, _> = tree.into();
 
         let mut jacobian = Jacobian::new();
         jacobian.setup(

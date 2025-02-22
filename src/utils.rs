@@ -1,5 +1,7 @@
 //! Util functions.
 
+// TODO move to arena folder
+
 /// Sorts a vector/slice by a vector of indices in O(n)
 ///
 /// Found on [stackoverflow](https://stackoverflow.com/a/69774341)
