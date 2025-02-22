@@ -1,6 +1,8 @@
-//! [Arena allocation](https://en.wikipedia.org/wiki/Region-based_memory_management)
-//! tree implementation. Uses iterator and references for
-//! traversal and is this slower than in implementation in the [depth] suubmodule
+//! Implementation of a directionally iterable
+//! [arena allocated](https://en.wikipedia.org/wiki/Region-based_memory_management)
+//! tree implementation, which supports depth- and breadth-first element iteration.
+//! Iteration uses references and if therefore slower than the implementation in the [depth]
+//! and [breadth] suubmodules.
 
 use super::iterables::{BaseDirectionIterable, DirectionIterable, Nodelike};
 use super::DepthFirstArenaTree;
@@ -8,18 +10,23 @@ use crate::MannequinError;
 use core::fmt;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
+
 /// A node structure to be used in an arena allocated tree. Fields are used to speed up iteration
 #[derive(Debug)]
 pub struct ArenaNode<Load, NodeId> {
+    /// The user-defined load that the node owns
     pub(super) load: Load,
+    /// Index in the arena allocation
     pub(super) index: usize,
-
+    /// identifier for lookups
     pub(super) id: NodeId,
+    /// references for children
     pub(super) children: Vec<usize>,
-    /// Only used when data is sorted as it is traversed
+    /// Used to optize sub-tree, depth-first traversal in [DepthFirstArenaTree]
     pub(super) width: usize,
-    /// Only used in depth-first interation ([DepthFirstIterator])
+    /// Depth in the tree
     depth: usize,
+    /// Only used in [DirectedArenaTree]
     parent_ref: Option<usize>,
 }
 
@@ -31,7 +38,7 @@ impl<Load, NodeRef> ArenaNode<Load, NodeRef> {
         width: usize,
         children: Vec<usize>,
         depth: usize,
-        parent: Option<usize>,
+        parent_ref: Option<usize>,
     ) -> Self {
         ArenaNode {
             load: payload,
@@ -40,7 +47,7 @@ impl<Load, NodeRef> ArenaNode<Load, NodeRef> {
             width,
             children,
             depth,
-            parent_ref: parent,
+            parent_ref,
         }
     }
 }
@@ -79,32 +86,21 @@ where
     }
 }
 
-/// Iterable tree that uses arena allocation.
+/// Iterable tree that uses arena allocation and allows for
+/// unoptimized (possibly slow) iteration/traversal in both
+/// directions: breadth-first and depth-first.
+/// Can be converted to a [DepthFirstIterable] implementation,
+/// namely [DepthFirstArenaTree], via a trait method or with `into()`
 ///
-/// Optimized for fast traversal. Building and optimizing the
-/// tree may be slower as a consequence. Adding nodes is fast
-/// but invalidates optimization. Optimization uses the slow
-/// general purpose iterators and caches the descending order.
-/// That way, we do not need to manyally update references
-/// to the children in each node.
-/// TODO: optimization should also change the order the nodes
-/// are stored (reduces the lookup) and change references but this
-/// is more complex. Would still be useful as it reduces traversal
-/// costs by two.
-///
-/// The struct also prefers speed for memory, and also keeping track
-/// of parents, width, and more information simplify the implementation.
+/// The tree is mutable, that is, adding nodes possible, unlike in
+/// the trees optimized for a single direction.
 pub struct DirectedArenaTree<Load, NodeID> {
     /// Memory allocated area for nodes
     pub(crate) nodes: Vec<ArenaNode<Load, NodeID>>,
 
-    // /// Caches the sequence of iteration (depth-first)
-    // depth_first_cache: Option<Vec<usize>>,
-    // /// Caches the sequence of iteration (breadth-first)
-    // breadh_first_cache: Option<Vec<usize>>,
-    /// Maximal recursion depth of the dree
     pub(super) max_depth: usize,
 
+    /// Lookup arena indices
     pub(super) lookup: HashMap<NodeID, usize>,
 }
 
@@ -314,7 +310,7 @@ impl<'a, T, NodeRef> Iterator for BreadthFirstIterator<'a, T, NodeRef> {
         todo!()
     }
 }
-/// Iterator for a depth-first iteration when the data is not already sorted accordingly
+/// Iterator for a depth-first iteration over an unsorted arena
 pub struct DepthFirstIterator<'a, 'b, T, N>
 where
     'a: 'b,

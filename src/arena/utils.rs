@@ -1,9 +1,6 @@
-//! Util functions.
-
-// TODO move to arena folder
+//! Utility function(s).
 
 /// Sorts a vector/slice by a vector of indices in O(n)
-///
 /// Found on [stackoverflow](https://stackoverflow.com/a/69774341)
 pub fn sort_by_indices<T>(data: &mut [T], mut indices: Vec<usize>) {
     for idx in 0..data.len() {
