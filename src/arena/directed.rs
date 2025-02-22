@@ -1,23 +1,23 @@
-use super::{BreadthFirstIterator, DepthFirstIterator};
-use crate::{
-    iterables::{BaseDirectionIterable, OptimizedDirectionIterable},
-    utils::sort_by_indices,
-    BreadthFirstIterable, DepthFirstIterable, DirectionIterable, MannequinError, Nodelike,
-};
+//! [Arena allocation](https://en.wikipedia.org/wiki/Region-based_memory_management)
+//! tree implementation. Uses iterator and references for
+//! traversal and is this slower than in implementation in the [depth] suubmodule
 
+use super::iterables::{BaseDirectionIterable, DirectionIterable, Nodelike};
+use super::DepthFirstArenaTree;
+use crate::MannequinError;
 use core::fmt;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 /// A node structure to be used in an arena allocated tree. Fields are used to speed up iteration
 #[derive(Debug)]
 pub struct ArenaNode<Load, NodeId> {
-    load: Load,
-    index: usize,
+    pub(super) load: Load,
+    pub(super) index: usize,
 
-    id: NodeId,
-    pub(crate) children: Vec<usize>,
+    pub(super) id: NodeId,
+    pub(super) children: Vec<usize>,
     /// Only used when data is sorted as it is traversed
-    width: usize,
+    pub(super) width: usize,
     /// Only used in depth-first interation ([DepthFirstIterator])
     depth: usize,
     parent_ref: Option<usize>,
@@ -103,9 +103,9 @@ pub struct DirectedArenaTree<Load, NodeID> {
     // /// Caches the sequence of iteration (breadth-first)
     // breadh_first_cache: Option<Vec<usize>>,
     /// Maximal recursion depth of the dree
-    pub(crate) max_depth: usize,
+    pub(super) max_depth: usize,
 
-    lookup: HashMap<NodeID, usize>,
+    pub(super) lookup: HashMap<NodeID, usize>,
 }
 
 impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
@@ -139,7 +139,7 @@ impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
 
     /// Given an squenze of nodes (i.e., an areana), update the references to child nodes when
     /// the arena is reorderd. It takes a sequence of the same size with the new indices as a parameter
-    fn update_child_indices(nodes: &mut [ArenaNode<Load, NodeId>], indices: &[usize]) {
+    pub(super) fn update_child_indices(nodes: &mut [ArenaNode<Load, NodeId>], indices: &[usize]) {
         nodes.iter_mut().for_each(|node| {
             node.children.iter_mut().for_each(|child_ref| {
                 *child_ref = indices
@@ -297,203 +297,73 @@ where
     }
 }
 
-pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>);
-
-impl<Load, NodeId> From<DirectedArenaTree<Load, NodeId>> for DepthFirstArenaTree<Load, NodeId>
-where
-    Load: 'static + fmt::Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
-{
-    fn from(mut value: DirectedArenaTree<Load, NodeId>) -> Self {
-        // sorts the order of nodes such that depth-first decent is optimal
-
-        let optimal_order = value.iter_depth().map(|node| node.index).collect_vec();
-
-        DirectedArenaTree::update_child_indices(&mut value.nodes, &optimal_order);
-        sort_by_indices(&mut value.nodes, optimal_order);
-
-        value.nodes.iter().for_each(|node| {
-            value.lookup.insert(node.id.clone(), node.index);
-        });
-        Self(value)
-    }
+pub struct BreadthFirstIterator<'a, T, NodeRef> {
+    #[allow(dead_code)]
+    tree: &'a DirectedArenaTree<T, NodeRef>,
+    root: Option<usize>,
 }
 
-impl<Load, NodeId> BaseDirectionIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
-where
-    Load: 'static + fmt::Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
-{
-    type Node = ArenaNode<Load, NodeId>;
-
-    fn root(&self) -> Result<&Self::Node, MannequinError<NodeId>> {
-        self.0.root()
-    }
-
-    fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>> {
-        self.0.children(node)
-    }
-
-    fn node_by_load(&self, load: &Load) -> Option<&Self::Node> {
-        self.0.node_by_load(load)
-    }
-
-    fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node> {
-        self.0.node_by_id(node_id)
-    }
-
-    fn nodes(&self) -> &[Self::Node] {
-        self.0.nodes()
+impl<'a, T, NodeRef> BreadthFirstIterator<'a, T, NodeRef> {
+    pub fn new(tree: &'a DirectedArenaTree<T, NodeRef>, root: usize) -> Self {
+        BreadthFirstIterator { tree, root: Some(root) }
     }
 }
+impl<'a, T, NodeRef> Iterator for BreadthFirstIterator<'a, T, NodeRef> {
+    type Item = &'a ArenaNode<T, NodeRef>;
 
-impl<Load, NodeId> OptimizedDirectionIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
-where
-    Load: 'static + fmt::Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
-{
-    fn iter(&self) -> impl Iterator<Item = &Self::Node> {
-        self.0.nodes.iter()
-    }
-
-    fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Node> {
-        self.0.nodes.iter_mut()
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
     }
 }
-
-impl<Load, NodeId> DepthFirstIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
+/// Iterator for a depth-first iteration when the data is not already sorted accordingly
+pub struct DepthFirstIterator<'a, 'b, T, N>
 where
-    Load: 'static + fmt::Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
+    'a: 'b,
+    T: 'static + fmt::Debug + PartialEq,
 {
-    fn iter_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node> {
-        let (start, width) = (root.index, root.width);
-        self.0.nodes[start..start + width].iter()
-    }
-
-    fn iter_sub_mut(&mut self, root: &Self::Node) -> impl Iterator<Item = &mut Self::Node> {
-        let (start, width) = (root.index, root.width);
-        self.0.nodes[start..start + width].iter_mut()
-    }
+    tree: &'a DirectedArenaTree<T, N>,
+    stack: Vec<std::slice::Iter<'b, usize>>,
+    root: Option<usize>,
 }
 
-struct BreaddthFirstArenaTree {}
-
-#[cfg(test)]
-mod tests {
-
-    use arena::arena_tree::DepthFirstArenaTree;
-    use iterables::BaseDirectionIterable;
-    use itertools::Itertools;
-    use test_log;
-
-    use crate::iterables::OptimizedDirectionIterable;
-    use crate::*;
-
-    #[test_log::test]
-    fn test_adding_iteration() {
-        // Loadas are integers chosen such that after optimization, they are sorted in increasing order
-        // IDs are string representations of integers that reflect the order of  insertion
-        // Before optimization, the nodes are stored according to the IDs, iteration is ordered by load
-        // because of the chosen tree layout. After optimization, the nodes are sorted by load.
-
-        // Layout of the tree (such that optimization will enforce reordering)
-        //     0
-        //    / \
-        //  1    5
-        // | \   |
-        // 2  4  6
-        // |
-        // 3
-
-        let mut tree = DirectedArenaTree::<usize, String>::new();
-
-        let root = tree.set_root(0, "root".to_string());
-
-        let first = tree.add(1, "first".to_string(), &root).unwrap();
-        let second = tree.add(5, "second".to_string(), &root).unwrap();
-        let third = tree.add(2, "third".to_string(), &first).unwrap();
-
-        tree.add(4, "fourth".to_string(), &first).unwrap();
-        tree.add(3, "fifth".to_string(), &third).unwrap();
-        tree.add(6, "sixth".to_string(), &second).unwrap();
-
-        // Check storage unoptimized for depth-first decent
-        assert_eq!(tree.nodes.iter().map(|n| n.load).collect_vec(), &[0, 1, 5, 2, 4, 3, 6]);
-        assert_eq!(
-            tree.nodes.iter().map(|n| &n.id).collect_vec(),
-            &["root", "first", "second", "third", "fourth", "fifth", "sixth"]
-        );
-
-        // This uses the depth slow first iterator!
-        let result = tree.iter_depth().map(|i| *i.get()).collect_vec();
-        assert_eq!(result, &[0, 1, 2, 3, 4, 5, 6]);
-        let result = tree.iter_depth().map(|i| i.id()).collect_vec();
-
-        // Check whether iteration is not in the same order as insertion and matches the expectation
-        assert_eq!(
-            result,
-            &["root", "first", "third", "fifth", "fourth", "second", "sixth"]
-        );
-
-        // Check correctness of child references for two nodes
-        assert_eq!(tree.nodes()[0].children, &[1, 2]);
-        assert_eq!(tree.nodes()[1].children, &[3, 4]);
-        assert_eq!(tree.nodes()[2].children, &[6]);
-        assert_eq!(tree.nodes()[3].children, &[5]);
-
-        // // Example of how to print the hierachy
-        // tree.nodes
-        // .iter()
-        // .enumerate()
-        // .for_each(|(i, n)| println!("{i}.: id: {}, load: {}, children {:?}", n.id, n.load, n.children));
-
-        // Optimize the tree such that the nodes are sorted in depth-frist manner
-        let tree: DepthFirstArenaTree<usize, String> = tree.into();
-
-        // Check correctness of child references for two nodes
-        assert_eq!(tree.0.nodes[0].children, &[1, 5]);
-        assert_eq!(tree.0.nodes[1].children, &[2, 4]);
-        assert_eq!(tree.0.nodes[2].children, &[3]);
-        assert_eq!(tree.0.nodes[5].children, &[6]);
-
-        // check correctness of storage
-        assert_eq!(
-            tree.0.nodes.iter().map(|n| n.load).collect_vec(),
-            &[0, 1, 2, 3, 4, 5, 6]
-        );
-
-        // Check whether indices are stored correctly
-        assert_eq!(
-            tree.0.nodes.iter().map(|n| n.index).collect_vec(),
-            &[0, 1, 2, 3, 4, 5, 6]
-        );
-
-        assert_eq!(
-            tree.0.nodes.iter().map(|n| &n.id).collect_vec(),
-            &["root", "first", "third", "fifth", "fourth", "second", "sixth"]
-        );
-
-        // Check whether the widths are computed correctly
-        let result = tree.0.nodes.iter().map(|n| n.width).collect_vec();
-        assert_eq!(result, &[7, 4, 2, 1, 1, 2, 1]);
-
-        // Now we can safely immutably borrow the node
-        let first_node = tree.node_by_id(&first).unwrap();
-
-        // Now check whether iterating over subtrees work
-        let result = tree.iter_sub(first_node).map(|i| *i.get()).collect_vec();
-        assert_eq!(result, &[1, 2, 3, 4]);
-        let second_node = tree.node_by_id(&second).unwrap();
-
-        let result = tree.iter_sub(second_node).map(|i| *i.get()).collect_vec();
-        assert_eq!(result, &[5, 6]);
-
-        // TODO Check whether bread-first works (this will already use the cache as optimize has been called)
+impl<'a, 'b, T, N> DepthFirstIterator<'a, 'b, T, N>
+where
+    T: 'static + fmt::Debug + PartialEq,
+{
+    // TODO did not manage to over write the root nodes :(
+    pub fn new(tree: &'a DirectedArenaTree<T, N>, root: usize) -> Self {
+        let stack = Vec::with_capacity(tree.max_depth);
+        println!("Creating new depth-first iterator (slow)");
+        DepthFirstIterator {
+            tree,
+            stack,
+            root: Some(root),
+        }
     }
+}
+impl<'a, 'b, T, N> Iterator for DepthFirstIterator<'a, 'b, T, N>
+where
+    T: fmt::Debug + PartialEq,
+{
+    type Item = &'a ArenaNode<T, N>;
 
-    #[test]
-    fn test_iter_mut() {
-        // TODO implement test for mutable iteration
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(root) = self.root {
+            let root = &self.tree.nodes[root];
+            self.stack.push(root.children.iter());
+            self.root = None;
+            Some(root)
+        } else if let Some(last) = self.stack.last_mut() {
+            if let Some(child_ref) = last.next() {
+                let node = &self.tree.nodes[*child_ref];
+                self.stack.push(node.children.iter());
+                Some(&self.tree.nodes[*child_ref])
+            } else {
+                self.stack.pop();
+                self.next()
+            }
+        } else {
+            None
+        }
     }
 }

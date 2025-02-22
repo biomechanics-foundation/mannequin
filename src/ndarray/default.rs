@@ -5,9 +5,9 @@ use super::{
     cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4, translate_x_4x4, translate_y_4x4,
     translate_z_4x4,
 };
-use crate::arena::arena_tree::DepthFirstArenaTree;
-use crate::iterables::OptimizedDirectionIterable;
-use crate::{DirectedArenaTree, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation};
+use crate::arena::iterables::OptimizedDirectionIterable;
+use crate::{DepthFirstArenaTree, Nodelike, TransformationAccumulation};
+use crate::{DirectedArenaTree, Forward, Inverse, Mannequin, Rigid};
 use core::fmt;
 use itertools::Itertools;
 use ndarray::prelude::*;
@@ -219,9 +219,7 @@ pub type BasicMannequin = Mannequin<DirectedArenaTree<Bone, LinkNodeId>, Bone, F
 mod tests {
     use super::super::Jacobian;
     use super::{Axis, Bone, DifferentialIK, ForwardsKinematics, LinkNodeId};
-    use crate::arena::arena_tree::DepthFirstArenaTree;
-    use crate::DirectionIterable;
-    use crate::{Differentiable, DirectedArenaTree, Forward, Rigid};
+    use crate::{DepthFirstArenaTree, Differentiable, DirectedArenaTree, DirectionIterable, Forward, Rigid};
     use approx::assert_abs_diff_eq;
     use itertools::Itertools;
     use ndarray::prelude::*;

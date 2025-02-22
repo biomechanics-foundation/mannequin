@@ -1,5 +1,9 @@
-pub mod arena_tree;
-pub mod iterators;
+pub mod depth;
+pub mod directed;
+pub mod iterables;
+mod utils;
 
-pub use arena_tree::{ArenaNode, DirectedArenaTree};
-pub use iterators::{BreadthFirstIterator, DepthFirstIterator};
+pub use depth::{DepthFirstAccumulation, DepthFirstArenaTree};
+pub use directed::{ArenaNode, BreadthFirstIterator, DepthFirstIterator, DirectedArenaTree};
+use iterables::BaseDirectionIterable;
+pub use iterables::{BreadthFirstIterable, DepthFirstIterable, DirectionIterable, Nodelike};
