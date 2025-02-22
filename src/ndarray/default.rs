@@ -6,7 +6,8 @@ use super::{
     translate_z_4x4,
 };
 use crate::{
-    ArenaTree, DepthFirst, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation, TreeIterable,
+    DepthFirst, DirectedArenaTree, Forward, Inverse, Mannequin, Nodelike, Rigid, TransformationAccumulation,
+    TreeIterable,
 };
 use core::fmt;
 use itertools::Itertools;
@@ -161,14 +162,14 @@ pub type LinkNodeId = <Bone as Rigid>::NodeId;
 pub struct ForwardsKinematics {
     max_depth: usize,
 }
-impl Forward<ArenaTree<Bone, LinkNodeId>, Bone> for ForwardsKinematics {
+impl Forward<DirectedArenaTree<Bone, LinkNodeId>, Bone> for ForwardsKinematics {
     type Parameter = Array1<f64>;
 
     type Transformation = Array2<f64>;
 
     fn solve(
         &mut self,
-        tree: &ArenaTree<Bone, LinkNodeId>,
+        tree: &DirectedArenaTree<Bone, LinkNodeId>,
         params: Self::Parameter,
         target_refs: &[LinkNodeId],
     ) -> Vec<Self::Transformation> {
@@ -191,18 +192,18 @@ pub struct DifferentialIK {
 }
 
 pub type DifferentialIKParameter =
-    <DifferentialIK as Inverse<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics>>::Parameter;
+    <DifferentialIK as Inverse<DirectedArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics>>::Parameter;
 pub type DifferentialIKArray =
-    <DifferentialIK as Inverse<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics>>::Array;
+    <DifferentialIK as Inverse<DirectedArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics>>::Array;
 
-impl Inverse<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics> for DifferentialIK {
+impl Inverse<DirectedArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics> for DifferentialIK {
     type Parameter = Array1<f64>;
 
     type Array = Array2<f64>;
 
     fn solve(
         &mut self,
-        tree: &ArenaTree<Bone, LinkNodeId>,
+        tree: &DirectedArenaTree<Bone, LinkNodeId>,
         fk: &ForwardsKinematics,
         param: Self::Parameter,
         target_refs: &[LinkNodeId],
@@ -212,13 +213,13 @@ impl Inverse<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics> for Differen
     }
 }
 
-pub type BasicMannequin = Mannequin<ArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics, DifferentialIK>;
+pub type BasicMannequin = Mannequin<DirectedArenaTree<Bone, LinkNodeId>, Bone, ForwardsKinematics, DifferentialIK>;
 
 #[cfg(test)]
 mod tests {
     use super::super::Jacobian;
     use super::{Axis, Bone, DifferentialIK, ForwardsKinematics, LinkNodeId};
-    use crate::{ArenaTree, Differentiable, Forward, Order::DepthFirst, Rigid, TreeIterable};
+    use crate::{Differentiable, DirectedArenaTree, Forward, Order::DepthFirst, Rigid, TreeIterable};
     use approx::assert_abs_diff_eq;
     use itertools::Itertools;
     use ndarray::prelude::*;
@@ -226,7 +227,7 @@ mod tests {
     #[test]
     fn test_fk() {
         let mut fk = ForwardsKinematics { max_depth: 10 };
-        let mut tree = ArenaTree::<Bone, LinkNodeId>::new();
+        let mut tree = DirectedArenaTree::<Bone, LinkNodeId>::new();
 
         let mut trafo = Bone::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
@@ -261,7 +262,7 @@ mod tests {
     #[test]
     fn test_jacobian() {
         let ik = DifferentialIK { max_depth: 10 };
-        let mut tree = ArenaTree::<Bone, LinkNodeId>::new();
+        let mut tree = DirectedArenaTree::<Bone, LinkNodeId>::new();
 
         let mut trafo = Bone::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);

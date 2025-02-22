@@ -25,17 +25,14 @@
 pub mod arena;
 pub mod differentiable;
 pub mod dummy;
-pub mod iterable_tree;
+pub mod iterables;
 pub mod mannequin;
 pub mod rigid;
 pub mod utils;
 
-pub use arena::{ArenaNode, ArenaTree};
+pub use arena::{ArenaNode, DirectedArenaTree};
 pub use differentiable::{Differentiable, VecJacobian};
-pub use iterable_tree::{
-    MannequinError, Nodelike, Order,
-    Order::{BreadthFirst, DepthFirst},
-};
+pub use iterables::{BreadthFirstIterable, DepthFirstIterable, DirectionIterable, MannequinError, Nodelike, Order};
 pub use mannequin::{Forward, Inverse, Mannequin};
 pub use rigid::{accumulate, Rigid, TransformationAccumulation};
 

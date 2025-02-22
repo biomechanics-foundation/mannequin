@@ -23,13 +23,13 @@ pub enum MannequinError<NodeID> {
     // TODO Errors specific to faer
 }
 
-/// Order of iteration
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Order {
-    DepthFirst,
-    BreadthFirst,
-    // Unordered,
-}
+// /// Order of iteration
+// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// pub enum Order {
+//     DepthFirst,
+//     BreadthFirst,
+//     // Unordered,
+// }
 
 /// Container that holds data in a `TreeIterable`
 pub trait Nodelike<Load, NodeId> {
@@ -45,7 +45,7 @@ pub trait Nodelike<Load, NodeId> {
     // Therefor this has been (will be) added there
 }
 
-trait BaseDirectionIterable<Load, NodeId>
+pub trait BaseDirectionIterable<Load, NodeId>
 where
     Load: PartialEq,
     NodeId: Eq + Clone + Hash + Debug,
@@ -65,20 +65,13 @@ where
 pub trait DirectionIterable<Load, NodeId>: BaseDirectionIterable<Load, NodeId>
 where
     Load: PartialEq,
-    NodeId: Eq + Clone + Hash,
+    NodeId: Eq + Clone + Hash + Debug,
 {
     fn iter_depth(&self) -> impl Iterator<Item = &Self::Node>;
     fn iter_depth_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node>;
 
     fn iter_breadth(&self) -> impl Iterator<Item = &Self::Node>;
     fn iter_breadth_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node>;
-
-    // Leave in for historic reasons .. until documented how to return Boxed iterators
-    // fn iter<'a, 'b>(&'a self, traversal: Order, root: Option<&Self::Node>) -> impl Iterator<Item = &'a Self::Node>
-    // where
-    //     'a: 'b;
-
-    // Modifying methods
 
     /// Add a new node to the tree. A tree can have multiple root nodes; their parents are `None`
     fn add(&mut self, load: Load, node_ref: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>>;
@@ -91,30 +84,29 @@ where
     fn to_breadth_first(self) -> impl BreadthFirstIterable<Load, NodeId>;
 }
 
-pub trait OptimizedDirectionIterable<Load, NodeId>: BaseDirectionIterable<Load, NodeId>
+// TODO do we need an intermediate trait? Yes, if we want to avoid duplication and have separate traits for depth-/breadth-frist. No, if we don't need those two
+trait OptimizedDirectionIterable<Load, NodeId>: BaseDirectionIterable<Load, NodeId>
 where
     Load: PartialEq,
-    NodeId: Eq + Clone + Hash,
+    NodeId: Eq + Clone + Hash + Debug,
 {
     fn iter(&self) -> impl Iterator<Item = &Self::Node>;
     fn iter_mut(&self) -> impl Iterator<Item = &mut Self::Node>;
-    fn iter_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node>;
-    // That one maybe not :-(
-    fn iter_sub_mut(&self, root: &Self::Node) -> impl Iterator<Item = &mut Self::Node>;
 }
 
 pub trait DepthFirstIterable<Load, NodeId>: OptimizedDirectionIterable<Load, NodeId>
 where
     Load: PartialEq,
-    NodeId: Eq + Clone + Hash,
+    NodeId: Eq + Clone + Hash + Debug,
 {
-    fn test() -> Self::Node;
+    fn iter_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node>;
+    fn iter_sub_mut(&self, root: &Self::Node) -> impl Iterator<Item = &mut Self::Node>;
 }
 
 pub trait BreadthFirstIterable<Load, NodeId>: OptimizedDirectionIterable<Load, NodeId>
 where
     Load: PartialEq,
-    NodeId: Eq + Clone + Hash,
+    NodeId: Eq + Clone + Hash + Debug,
 {
-    // Either copy or make extending traits with no additional methods
+    // subtree iteration more difficult in bredth-first ordering.
 }

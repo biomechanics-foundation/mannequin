@@ -1,5 +1,5 @@
 /*! Implementation of a tree iteration with [arena allocation](https://en.wikipedia.org/wiki/Region-based_memory_management) */
-use super::arena_tree::{ArenaNode, ArenaTree};
+use super::arena_tree::{ArenaNode, DirectedArenaTree};
 use crate::Nodelike;
 use core::fmt;
 
@@ -9,7 +9,7 @@ where
     'a: 'b,
     T: 'static + fmt::Debug + PartialEq,
 {
-    tree: &'a ArenaTree<T, N>,
+    tree: &'a DirectedArenaTree<T, N>,
     stack: Vec<std::slice::Iter<'b, usize>>,
     root: Option<usize>,
 }
@@ -19,7 +19,7 @@ where
     T: 'static + fmt::Debug + PartialEq,
 {
     // TODO did not manage to over write the root nodes :(
-    pub fn new(tree: &'a ArenaTree<T, N>, root: usize) -> Self {
+    pub fn new(tree: &'a DirectedArenaTree<T, N>, root: usize) -> Self {
         let stack = Vec::with_capacity(tree.max_depth);
         println!("Creating new depth-first iterator (slow)");
         DepthFirstIterator {
@@ -60,11 +60,11 @@ where
 
 pub struct BreadthFirstIterator<'a, T, NodeRef> {
     #[allow(dead_code)]
-    tree: &'a ArenaTree<T, NodeRef>,
+    tree: &'a DirectedArenaTree<T, NodeRef>,
 }
 
 impl<'a, T, NodeRef> BreadthFirstIterator<'a, T, NodeRef> {
-    pub fn new(tree: &'a ArenaTree<T, NodeRef>) -> Self {
+    pub fn new(tree: &'a DirectedArenaTree<T, NodeRef>) -> Self {
         BreadthFirstIterator { tree }
     }
 }
