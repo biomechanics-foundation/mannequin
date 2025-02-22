@@ -57,7 +57,7 @@ where
 }
 
 // TODO do we need an intermediate trait? Yes, if we want to avoid duplication and have separate traits for depth-/breadth-frist. No, if we don't need those two
-pub(crate) trait OptimizedDirectionIterable<Load, NodeId>: BaseDirectionIterable<Load, NodeId>
+pub trait OptimizedDirectionIterable<Load, NodeId>: BaseDirectionIterable<Load, NodeId>
 where
     Load: PartialEq,
     NodeId: Eq + Clone + Hash + Debug,

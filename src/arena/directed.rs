@@ -300,12 +300,11 @@ where
 pub struct BreadthFirstIterator<'a, T, NodeRef> {
     #[allow(dead_code)]
     tree: &'a DirectedArenaTree<T, NodeRef>,
-    root: Option<usize>,
 }
 
 impl<'a, T, NodeRef> BreadthFirstIterator<'a, T, NodeRef> {
-    pub fn new(tree: &'a DirectedArenaTree<T, NodeRef>, root: usize) -> Self {
-        BreadthFirstIterator { tree, root: Some(root) }
+    pub fn new(tree: &'a DirectedArenaTree<T, NodeRef>, _root: usize) -> Self {
+        BreadthFirstIterator { tree }
     }
 }
 impl<'a, T, NodeRef> Iterator for BreadthFirstIterator<'a, T, NodeRef> {
@@ -326,7 +325,7 @@ where
     root: Option<usize>,
 }
 
-impl<'a, 'b, T, N> DepthFirstIterator<'a, 'b, T, N>
+impl<'a, T, N> DepthFirstIterator<'a, '_, T, N>
 where
     T: 'static + fmt::Debug + PartialEq,
 {
@@ -341,7 +340,7 @@ where
         }
     }
 }
-impl<'a, 'b, T, N> Iterator for DepthFirstIterator<'a, 'b, T, N>
+impl<'a, T, N> Iterator for DepthFirstIterator<'a, '_, T, N>
 where
     T: fmt::Debug + PartialEq,
 {
