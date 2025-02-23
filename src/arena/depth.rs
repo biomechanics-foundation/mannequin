@@ -2,8 +2,8 @@
 //! order for faster access
 
 use super::{
-    iterables::OptimizedDirectionIterable, utils::sort_by_indices, ArenaNode, BaseDirectionIterable,
-    DepthFirstIterable, DirectedArenaTree, DirectionIterable, Nodelike,
+    directed::ArenaIndex, iterables::OptimizedDirectionIterable, utils::sort_by_indices, ArenaNode,
+    BaseDirectionIterable, DepthFirstIterable, DirectedArenaTree, DirectionIterable, Nodelike,
 };
 use crate::MannequinError;
 use itertools::Itertools;
@@ -86,6 +86,59 @@ where
     fn iter_sub_mut(&mut self, root: &Self::Node) -> impl Iterator<Item = &mut Self::Node> {
         let (start, width) = (root.index, root.width);
         self.0.nodes[start.0..start.0 + width].iter_mut()
+    }
+}
+
+/// Iterator for a depth-first iteration over an unsorted arena
+pub struct DepthFirstIterator<'a, 'b, T, N>
+where
+    'a: 'b,
+    T: 'static + Debug + PartialEq,
+{
+    tree: &'a DirectedArenaTree<T, N>,
+    stack: Vec<std::slice::Iter<'b, ArenaIndex>>,
+    root: Option<ArenaIndex>,
+}
+
+impl<'a, T, N> DepthFirstIterator<'a, '_, T, N>
+where
+    T: 'static + Debug + PartialEq,
+{
+    // TODO did not manage to over write the root nodes :(
+    pub fn new(tree: &'a DirectedArenaTree<T, N>, root: ArenaIndex) -> Self {
+        let stack = Vec::with_capacity(tree.max_depth);
+        println!("Creating new depth-first iterator (slow)");
+        DepthFirstIterator {
+            tree,
+            stack,
+            root: Some(root),
+        }
+    }
+}
+impl<'a, T, N> Iterator for DepthFirstIterator<'a, '_, T, N>
+where
+    T: Debug + PartialEq,
+{
+    type Item = &'a ArenaNode<T, N>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(root) = &self.root {
+            let root = &self.tree.nodes[root.0];
+            self.stack.push(root.children.iter());
+            self.root = None;
+            Some(root)
+        } else if let Some(last) = self.stack.last_mut() {
+            if let Some(child_ref) = last.next() {
+                let node = &self.tree.nodes[child_ref.0];
+                self.stack.push(node.children.iter());
+                Some(&self.tree.nodes[child_ref.0])
+            } else {
+                self.stack.pop();
+                self.next()
+            }
+        } else {
+            None
+        }
     }
 }
 

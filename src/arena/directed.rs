@@ -5,7 +5,7 @@
 //! and [breadth] suubmodules.
 
 use super::iterables::{BaseDirectionIterable, DirectionIterable, Nodelike};
-use super::DepthFirstArenaTree;
+use super::{DepthFirstArenaTree, DepthFirstIterator};
 use crate::MannequinError;
 use core::fmt;
 use itertools::Itertools;
@@ -315,57 +315,5 @@ impl<'a, T, NodeRef> Iterator for BreadthFirstIterator<'a, T, NodeRef> {
 
     fn next(&mut self) -> Option<Self::Item> {
         todo!()
-    }
-}
-/// Iterator for a depth-first iteration over an unsorted arena
-pub struct DepthFirstIterator<'a, 'b, T, N>
-where
-    'a: 'b,
-    T: 'static + fmt::Debug + PartialEq,
-{
-    tree: &'a DirectedArenaTree<T, N>,
-    stack: Vec<std::slice::Iter<'b, ArenaIndex>>,
-    root: Option<ArenaIndex>,
-}
-
-impl<'a, T, N> DepthFirstIterator<'a, '_, T, N>
-where
-    T: 'static + fmt::Debug + PartialEq,
-{
-    // TODO did not manage to over write the root nodes :(
-    pub fn new(tree: &'a DirectedArenaTree<T, N>, root: ArenaIndex) -> Self {
-        let stack = Vec::with_capacity(tree.max_depth);
-        println!("Creating new depth-first iterator (slow)");
-        DepthFirstIterator {
-            tree,
-            stack,
-            root: Some(root),
-        }
-    }
-}
-impl<'a, T, N> Iterator for DepthFirstIterator<'a, '_, T, N>
-where
-    T: fmt::Debug + PartialEq,
-{
-    type Item = &'a ArenaNode<T, N>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(root) = &self.root {
-            let root = &self.tree.nodes[root.0];
-            self.stack.push(root.children.iter());
-            self.root = None;
-            Some(root)
-        } else if let Some(last) = self.stack.last_mut() {
-            if let Some(child_ref) = last.next() {
-                let node = &self.tree.nodes[child_ref.0];
-                self.stack.push(node.children.iter());
-                Some(&self.tree.nodes[child_ref.0])
-            } else {
-                self.stack.pop();
-                self.next()
-            }
-        } else {
-            None
-        }
     }
 }
