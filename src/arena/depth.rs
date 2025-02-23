@@ -142,67 +142,6 @@ where
     }
 }
 
-// TODO the following iterator should be
-// * checked whether it is needed
-// * implemented for not a box
-// * we could directly add accumulate to the depthfirst trait??
-
-/// Accumulation over a *Depth First* iteration (this is not checked).
-pub trait DepthFirstAccumulation<'a, Node, Load, F, Parameter, Accumulated, NodeRef>
-where
-    Node: Nodelike<Load, NodeRef> + 'a,
-    F: Fn(&Node, &Parameter, &Accumulated) -> Accumulated + 'static,
-    Accumulated: Clone,
-{
-    /// Method on an iterator. Accepts a slice of parameters used to
-    /// compute a value that can be accumulated considering the depth of the tree.
-    /// The latter means that each node receives the accumulated values from its parent.
-    /// The calculation of the value and the accumulation is specified by the `accumulator`
-    /// parameter (usually, a closure). Accumulation requires a `first` element (neutral element)
-    /// and a max depth (for performance)
-    fn accumulate(
-        self,
-        param: &[Parameter],
-        accumulator: F,
-        first: Accumulated,
-        max_depth: usize,
-    ) -> impl Iterator<Item = (&'a Node, Accumulated)>;
-}
-
-impl<'a, 'b, Node, Load, F, Parameter, Accumulated, NodeRef>
-    DepthFirstAccumulation<'a, Node, Load, F, Parameter, Accumulated, NodeRef>
-    for Box<dyn Iterator<Item = &'a Node> + 'b>
-where
-    Node: Nodelike<Load, NodeRef> + 'a,
-    F: Fn(&Node, &Parameter, &Accumulated) -> Accumulated + 'static,
-    Accumulated: Clone,
-{
-    fn accumulate(
-        self,
-        param: &[Parameter],
-        acc: F,
-        first: Accumulated,
-        max_depth: usize,
-    ) -> impl Iterator<Item = (&'a Node, Accumulated)> {
-        self.into_iter()
-            .zip(param.iter())
-            // TODO look up whether the move here (required for the acc parameter) slows down execution
-            // TODO this function should replace the accumulation in `rigid.rs`
-            .scan(
-                Vec::<Accumulated>::with_capacity(max_depth),
-                move |stack, (node, param)| {
-                    let depth = stack.len();
-                    while node.depth() < depth {
-                        stack.pop();
-                    }
-                    let result = acc(node, param, stack.last().unwrap_or(&first));
-                    stack.push(result.clone());
-                    Some((node, result))
-                },
-            )
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
