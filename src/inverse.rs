@@ -7,7 +7,7 @@ where
     IT: DepthFirstIterable<RB, RB::NodeId>,
 
     RB: Rigid,
-    FK: Forward<IT, RB, Transformation = Self::Array>,
+    FK: Forward<IT, RB>,
 {
     type Parameter: IntoIterator<Item = RB::Parameter>;
     type Array;

@@ -72,6 +72,8 @@ where
 {
     fn iter(&self) -> impl Iterator<Item = &Self::Node>;
     fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Node>;
+    // TODO: As these trees are mutuable (i.e., no nodes can be added), we can use the arena
+    // index for much faster lookups. Hashmaps are slow!
 }
 
 /// An immutable (in a sense of modifying the tree by adding nodes) depth-first itrable/traversable

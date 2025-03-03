@@ -75,7 +75,7 @@ where
     IT: DepthFirstIterable<RB, RB::NodeId>,
 
     FK: Forward<IT, RB>,
-    IK: Inverse<IT, RB, FK, Array = FK::Transformation>,
+    IK: Inverse<IT, RB, FK>,
 {
     pub tree: IT,
     pub fk: FK,
@@ -88,7 +88,7 @@ where
     RB: Rigid,
     IT: DepthFirstIterable<RB, RB::NodeId>,
     FK: Forward<IT, RB>,
-    IK: Inverse<IT, RB, FK, Array = FK::Transformation>,
+    IK: Inverse<IT, RB, FK>,
 {
     pub fn new(tree: IT, foward_kinematics: FK, inverse_kinematics: IK) -> Self {
         Mannequin {
@@ -100,7 +100,7 @@ where
     }
 
     /// Forward kinematics for the targets in `target_refs` and the joint positions in `param`.
-    pub fn forward(&mut self, param: FK::Parameter, target_refs: &[RB::NodeId]) -> Vec<FK::Transformation> {
+    pub fn forward(&mut self, param: FK::Parameter, target_refs: &[RB::NodeId]) -> Vec<RB::Transformation> {
         self.fk.solve(&self.tree, param, target_refs)
     }
 

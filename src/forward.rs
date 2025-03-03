@@ -11,10 +11,9 @@ where
 {
     // TODO maybe change to slice
     type Parameter: IntoIterator<Item = RB::Parameter>;
-    type Transformation;
 
     // TODO this can have a default implementation
-    fn solve(&mut self, tree: &IT, params: Self::Parameter, target_refs: &[RB::NodeId]) -> Vec<Self::Transformation>;
+    fn solve(&mut self, tree: &IT, params: Self::Parameter, target_refs: &[RB::NodeId]) -> Vec<RB::Transformation>;
 }
 
 /// Helper function to be used in [std::iter::Scan] for accumulating transformations from direct path from a root to a node

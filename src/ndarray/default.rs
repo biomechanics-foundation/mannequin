@@ -164,14 +164,12 @@ pub struct ForwardsKinematics {
 impl Forward<DepthFirstArenaTree<Bone, LinkNodeId>, Bone> for ForwardsKinematics {
     type Parameter = Array1<f64>;
 
-    type Transformation = Array2<f64>;
-
     fn solve(
         &mut self,
         tree: &DepthFirstArenaTree<Bone, LinkNodeId>,
         params: Self::Parameter,
         target_refs: &[LinkNodeId],
-    ) -> Vec<Self::Transformation> {
+    ) -> Vec<<Bone as Rigid>::Transformation> {
         tree.iter()
             .accumulate_transformations(params.as_slice().unwrap(), self.max_depth)
             .filter_map(|(node, trafo)| {
