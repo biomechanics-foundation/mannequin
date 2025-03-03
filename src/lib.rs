@@ -35,7 +35,7 @@ pub use arena::{
 };
 pub use differentiable::{Differentiable, VecJacobian};
 pub use errors::MannequinError;
-pub use forward::{accumulate, Forward, TransformationAccumulation};
+pub use forward::{Forward, ForwardsKinematics};
 pub use inverse::Inverse;
 pub use mannequin::{Mannequin, Rigid};
 // Backends

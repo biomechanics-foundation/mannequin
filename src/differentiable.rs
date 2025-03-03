@@ -1,4 +1,4 @@
-use crate::{DepthFirstIterable, Nodelike, Rigid, TransformationAccumulation};
+use crate::{forward::TransformationAccumulation, DepthFirstIterable, Nodelike, Rigid};
 use itertools::{izip, Itertools};
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;

@@ -1,5 +1,7 @@
 /*! Defines the payload carried by [Nodelike] in the context of kinematics/character animation */
 
+use itertools::Itertools;
+
 use crate::{mannequin::Rigid, DepthFirstIterable, Nodelike};
 
 /// Trait representing a stateful forward kinematics algoritm. For instance, it can represent a rigid body mannequin
@@ -9,11 +11,54 @@ where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid,
 {
-    // TODO maybe change to slice
-    type Parameter: IntoIterator<Item = RB::Parameter>;
+    fn initialize(&mut self, tree: &IT, target_refs: &[RB::NodeId]);
+    fn solve(&mut self, tree: &IT, params: &[RB::Parameter]) -> Vec<RB::Transformation>;
+}
 
-    // TODO this can have a default implementation
-    fn solve(&mut self, tree: &IT, params: Self::Parameter, target_refs: &[RB::NodeId]) -> Vec<RB::Transformation>;
+pub struct ForwardsKinematics<RB>
+where
+    RB: Rigid,
+{
+    max_depth: usize,
+    target_refs: Vec<<RB as Rigid>::NodeId>,
+}
+
+impl<RB> ForwardsKinematics<RB>
+where
+    RB: Rigid,
+{
+    pub fn new(max_depth: usize) -> Self {
+        Self {
+            max_depth,
+            target_refs: vec![],
+        }
+    }
+}
+
+impl<IT, RB> Forward<IT, RB> for ForwardsKinematics<RB>
+where
+    IT: DepthFirstIterable<RB, RB::NodeId>,
+    RB: Rigid,
+{
+    fn solve(&mut self, tree: &IT, params: &[<RB as Rigid>::Parameter]) -> Vec<<RB as Rigid>::Transformation> {
+        // TODO Optimization: use Vec<bool> instead of checking for target refs! Order of descent cannot change
+
+        tree.iter()
+            .accumulate_transformations(params, self.max_depth)
+            .filter_map(|(node, trafo)| {
+                if self.target_refs.is_empty() || self.target_refs.contains(&node.id()) {
+                    Some(trafo)
+                } else {
+                    None
+                }
+            })
+            .collect_vec()
+    }
+
+    fn initialize(&mut self, _tree: &IT, target_refs: &[<RB as Rigid>::NodeId]) {
+        self.target_refs.clear();
+        self.target_refs.extend_from_slice(target_refs);
+    }
 }
 
 /// Helper function to be used in [std::iter::Scan] for accumulating transformations from direct path from a root to a node
@@ -70,6 +115,5 @@ where
             .scan(Vec::<Load::Transformation>::with_capacity(max_depth), accumulate)
     }
 }
-
 #[cfg(test)]
 mod tests {}
