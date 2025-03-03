@@ -5,7 +5,7 @@
 //! and [breadth] suubmodules.
 
 use super::iterables::{BaseDirectionIterable, DirectionIterable, Nodelike};
-use super::{DepthFirstArenaTree, DepthFirstIterator};
+use super::{BreadthFirstIterator, DepthFirstArenaTree, DepthFirstIterator};
 use crate::MannequinError;
 use core::fmt;
 use itertools::Itertools;
@@ -199,10 +199,6 @@ where
 
         // self.nodes.iter().find(|node| node.id == *node_ref)
     }
-
-    fn nodes(&self) -> &[Self::Node] {
-        &self.nodes
-    }
 }
 
 impl<Load, NodeId> DirectionIterable<Load, NodeId> for DirectedArenaTree<Load, NodeId>
@@ -297,23 +293,5 @@ where
         self.nodes.push(root);
         self.lookup.insert(root_ref, ArenaIndex(0));
         self.nodes[0].id.clone()
-    }
-}
-
-pub struct BreadthFirstIterator<'a, T, NodeRef> {
-    #[allow(dead_code)]
-    tree: &'a DirectedArenaTree<T, NodeRef>,
-}
-
-impl<'a, T, NodeRef> BreadthFirstIterator<'a, T, NodeRef> {
-    pub fn new(tree: &'a DirectedArenaTree<T, NodeRef>, _root: ArenaIndex) -> Self {
-        BreadthFirstIterator { tree }
-    }
-}
-impl<'a, T, NodeRef> Iterator for BreadthFirstIterator<'a, T, NodeRef> {
-    type Item = &'a ArenaNode<T, NodeRef>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        todo!()
     }
 }

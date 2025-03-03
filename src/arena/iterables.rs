@@ -35,8 +35,6 @@ where
     fn node_by_load(&self, load: &Load) -> Option<&Self::Node>;
     /// Get [NodeLike] from an identifier.
     fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node>;
-    /// Get reference to all nodes.
-    fn nodes(&self) -> &[Self::Node];
 }
 
 /// Trait for a mutable tree that can be iterated (traverserd) in both directions: depth-first and

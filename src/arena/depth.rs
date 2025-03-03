@@ -2,8 +2,8 @@
 //! order for faster access
 
 use super::{
-    directed::ArenaIndex, iterables::OptimizedDirectionIterable, utils::sort_by_indices, ArenaNode,
-    BaseDirectionIterable, DepthFirstIterable, DirectedArenaTree, DirectionIterable, Nodelike,
+    iterables::OptimizedDirectionIterable, utils::sort_by_indices, ArenaIndex, ArenaNode, BaseDirectionIterable,
+    DepthFirstIterable, DirectedArenaTree, DirectionIterable,
 };
 use crate::MannequinError;
 use itertools::Itertools;
@@ -52,10 +52,6 @@ where
 
     fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node> {
         self.0.node_by_id(node_id)
-    }
-
-    fn nodes(&self) -> &[Self::Node] {
-        self.0.nodes()
     }
 }
 
@@ -198,10 +194,10 @@ mod tests {
         );
 
         // Check correctness of child references for two nodes
-        assert_eq!(tree.nodes()[0].children, &[ArenaIndex(1), ArenaIndex(2)]);
-        assert_eq!(tree.nodes()[1].children, &[ArenaIndex(3), ArenaIndex(4)]);
-        assert_eq!(tree.nodes()[2].children, &[ArenaIndex(6)]);
-        assert_eq!(tree.nodes()[3].children, &[ArenaIndex(5)]);
+        assert_eq!(tree.nodes[0].children, &[ArenaIndex(1), ArenaIndex(2)]);
+        assert_eq!(tree.nodes[1].children, &[ArenaIndex(3), ArenaIndex(4)]);
+        assert_eq!(tree.nodes[2].children, &[ArenaIndex(6)]);
+        assert_eq!(tree.nodes[3].children, &[ArenaIndex(5)]);
 
         // // Example of how to print the hierachy
         // tree.nodes
