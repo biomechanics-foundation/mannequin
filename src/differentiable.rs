@@ -1,10 +1,9 @@
-use crate::{DepthFirst, Nodelike, Rigid, TransformationAccumulation, TreeIterable};
+use crate::{DepthFirstIterable, Nodelike, Rigid, TransformationAccumulation};
 use itertools::{izip, Itertools};
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
-// TODO maybe make precision generic
 pub trait Differentiable {
     type Data<'a>
     where
@@ -13,16 +12,15 @@ pub trait Differentiable {
     /// returns a reference to the internal data type
     fn jacobian(&self) -> Self::Data<'_>;
 
-    // TODO
     /// compute the jacobian matrix
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<I>, selected_effectors: &HashSet<I>)
     where
-        T: TreeIterable<R, I>,
+        T: DepthFirstIterable<R, I>,
         R: Rigid,
         I: Eq + Clone + Hash + Debug;
     fn compute<T, R, I>(&mut self, tree: &T, params: &[R::Parameter])
     where
-        T: TreeIterable<R, I>,
+        T: DepthFirstIterable<R, I>,
         R: Rigid,
         I: Eq + Clone + Hash + Debug;
 
@@ -61,20 +59,14 @@ impl Differentiable for VecJacobian {
 
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<I>, selected_effectors: &HashSet<I>)
     where
-        T: TreeIterable<R, I>,
+        T: DepthFirstIterable<R, I>,
         R: Rigid,
         I: Eq + Clone + Hash + Debug,
     {
-        self.selected_joints = tree
-            .iter(DepthFirst, None)
-            .map(|n| selected_joints.get(&n.id()).is_some())
-            .collect();
-        self.selected_effectors = tree
-            .iter(DepthFirst, None)
-            .map(|n| selected_effectors.get(&n.id()).is_some())
-            .collect();
+        self.selected_joints = tree.iter().map(|n| selected_joints.get(&n.id()).is_some()).collect();
+        self.selected_effectors = tree.iter().map(|n| selected_effectors.get(&n.id()).is_some()).collect();
         self.offsets = tree
-            .iter(DepthFirst, None)
+            .iter()
             .scan(0, |offset, node| {
                 let result = Some(*offset);
                 if selected_effectors.get(&node.id()).is_some() {
@@ -105,13 +97,13 @@ impl Differentiable for VecJacobian {
 
     fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter])
     where
-        T: TreeIterable<R, I>,
+        T: DepthFirstIterable<R, I>,
         R: Rigid,
         I: Eq + Clone + Hash + Debug,
     {
         // compute transformations only once
         let nodes_trafos = tree
-            .iter(DepthFirst, None)
+            .iter()
             .accumulate_transformations(params, 42)
             .enumerate()
             .map(|(idx, (node, trafo))| (idx, node, trafo)) // flatten
@@ -122,7 +114,7 @@ impl Differentiable for VecJacobian {
         self.data
             // .iter_mut()
             .chunks_mut(self.rows)
-            // TODO use rayon: into_par_iter()
+            // TODO use rayon
             .zip(
                 nodes_trafos
                     .iter()
@@ -132,7 +124,7 @@ impl Differentiable for VecJacobian {
             )
             .for_each(|(col, (idx, joint_node, joint_pose))| {
                 izip!(
-                    tree.iter(DepthFirst, Some(joint_node)), // iterating over the child tree
+                    tree.iter_sub(joint_node), // iterating over the child tree
                     // zipping the corresponding trafos (by skipping until the current node) and the offsets in the column
                     // Using the index here is ok, keeping an iterator is to hard (gets mutated in a different closure)
                     nodes_trafos.iter().skip(*idx).map(|(_, _, trafo)| trafo),

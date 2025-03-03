@@ -4,14 +4,14 @@
  * realistic joints, muscle simulation, or classical inverse kinematics and obstacle avoidance.
  */
 
-use crate::{Rigid, TreeIterable};
+use crate::{DepthFirstIterable, Rigid};
 use std::marker::PhantomData;
 
 /// Trait representing a stateful forward kinematics algoritm. For instance, it can represent a rigid body mannequin
 /// (e.g., a robot) or softbody/skinning for character animation.
 pub trait Forward<IT, RB>
 where
-    IT: TreeIterable<RB, RB::NodeId>,
+    IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid,
 {
     // TODO maybe change to slice
@@ -26,7 +26,7 @@ where
 pub trait Inverse<IT, RB, FK>
 where
     // Avoid mixing of backends
-    IT: TreeIterable<RB, RB::NodeId>,
+    IT: DepthFirstIterable<RB, RB::NodeId>,
 
     RB: Rigid,
     FK: Forward<IT, RB, Transformation = Self::Array>,
@@ -44,16 +44,12 @@ where
     ) -> Self::Parameter;
 }
 
-// pub trait Differential<T>: Inverse<T> {
-//     fn get_jacobian(&self, tree: IT, param: Self::Parameter, roots: &[IT::NodeRef]) -> Self::Array;
-// }
-
 /// Struct for holding the composition of character animation algorithms in a flat architecture for
 /// character animation.
 pub struct Mannequin<IT, RB, FK, IK>
 where
     RB: Rigid,
-    IT: TreeIterable<RB, RB::NodeId>,
+    IT: DepthFirstIterable<RB, RB::NodeId>,
 
     FK: Forward<IT, RB>,
     IK: Inverse<IT, RB, FK, Array = FK::Transformation>,
@@ -67,7 +63,7 @@ where
 impl<IT, RB, FK, IK> Mannequin<IT, RB, FK, IK>
 where
     RB: Rigid,
-    IT: TreeIterable<RB, RB::NodeId>,
+    IT: DepthFirstIterable<RB, RB::NodeId>,
     FK: Forward<IT, RB>,
     IK: Inverse<IT, RB, FK, Array = FK::Transformation>,
 {

@@ -1,5 +1,5 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
-use crate::{Differentiable, MannequinError, Rigid, TreeIterable, VecJacobian};
+use crate::{DepthFirstIterable, Differentiable, MannequinError, Rigid, VecJacobian};
 use ndarray::Order;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
 use std::collections::HashSet;
@@ -39,7 +39,7 @@ impl Differentiable for Jacobian {
 
     fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>)
     where
-        T: TreeIterable<R, I>,
+        T: DepthFirstIterable<R, I>,
         R: Rigid,
         I: Eq + Clone + Hash + Debug,
     {
@@ -56,7 +56,7 @@ impl Differentiable for Jacobian {
 
     fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter])
     where
-        T: TreeIterable<R, I>,
+        T: DepthFirstIterable<R, I>,
         R: Rigid,
         I: Eq + Clone + Hash + Debug,
     {
@@ -151,8 +151,6 @@ pub fn cross_3d<T>(
     if a.len() != 3 || b.len() != 3 || target.len() != 3 {
         Err(ShapeError::from_kind(IncompatibleShape).into())
     } else {
-        // TODO, is vec slower than
-
         target[0] = a[1] * b[2] - a[2] * b[1];
         target[1] = a[2] * b[0] - a[0] * b[2];
         target[2] = a[0] * b[1] - a[1] * b[0];
