@@ -103,6 +103,7 @@ pub struct DirectedArenaTree<Load, NodeID> {
 
     pub(super) max_depth: usize,
 
+    // TODO optimization: https://crates.io/crates/rustc-hash (feature)
     /// Lookup arena indices
     pub(super) lookup: HashMap<NodeID, ArenaIndex>,
 }
@@ -179,6 +180,8 @@ where
         let id = node.id();
         // can we rely on this check?
         self.node_by_id(&id).ok_or(MannequinError::UnkonwnNode(id))?;
+
+        // FIXME: map node.children to the nodes (don't loop over everything)
         Ok(self
             .nodes
             .iter()
@@ -191,13 +194,8 @@ where
     }
 
     fn node_by_id(&self, node_ref: &NodeId) -> Option<&Self::Node> {
-        // A hashmap is be faster: O(1)
-        // TODO Confirm code is still working
-
         let index = self.lookup.get(node_ref)?;
         self.nodes.get(index.0)
-
-        // self.nodes.iter().find(|node| node.id == *node_ref)
     }
 }
 
@@ -231,7 +229,7 @@ where
     //     unimplemented!();
     // }
 
-    fn add(&mut self, load: Load, node_ref: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>> {
+    fn add(&mut self, load: Load, node_id: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>> {
         let parent = self
             .node_by_id(parent)
             .ok_or(MannequinError::UnkonwnNode(parent.clone()))?;
@@ -239,10 +237,9 @@ where
 
         let index = self.nodes.len();
 
-        // First check whether we can add the node (id not used yet)
-        // TODO: This check was after updatinng the parent which should be wrong. Confirm that it's working here.
-        if self.nodes.iter().any(|n| n.id() == node_ref) {
-            return Err(MannequinError::NotUnique(node_ref));
+        // First check whether we can add the node (i.e., id not used yet)
+        if self.nodes.iter().any(|n| n.id() == node_id) {
+            return Err(MannequinError::NotUnique(node_id));
         }
         let parent_index = parent.index;
         let mut parent = self
@@ -268,11 +265,11 @@ where
             parent.width += 1;
         }
 
-        self.lookup.insert(node_ref.clone(), ArenaIndex(index));
+        self.lookup.insert(node_id.clone(), ArenaIndex(index));
         // Finally, add the node
         self.nodes.push(ArenaNode::new(
             load,
-            node_ref,
+            node_id,
             ArenaIndex(index),
             1,
             vec![],
@@ -280,10 +277,6 @@ where
             Some(parent_index),
         ));
 
-        // println!(
-        //     "Nodes after insert {:?}",
-        //     self.nodes.iter().map(|i| (&i.load, i.depth)).collect_vec()
-        // );
         Ok(self.nodes.last().unwrap().id.clone())
     }
 

@@ -30,7 +30,7 @@ where
     /// Get the (single) root node of the tree.
     fn root(&self) -> Result<&Self::Node, MannequinError<NodeId>>;
     /// Access the children of a node. Not implemented on [Nodelike] for simplicity
-    fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>>; // TODO: Does this need to be a vec?
+    fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>>;
     /// Lookup a node by its load.
     fn node_by_load(&self, load: &Load) -> Option<&Self::Node>;
     /// Get [NodeLike] from an identifier.
@@ -53,14 +53,14 @@ where
     fn iter_breadth_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node>;
 
     /// Add a new node to the tree. A tree can have multiple root nodes; their parents are `None`
-    fn add(&mut self, load: Load, node_ref: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>>;
+    fn add(&mut self, load: Load, node_id: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>>;
 
     /// Deletes all nodes and sets a new root
     fn set_root(&mut self, root_load: Load, root_ref: NodeId) -> NodeId;
 
     /// Generate optimized
     fn depth_first(self) -> impl DepthFirstIterable<Load, NodeId>;
-    // TODO: needs implementation
+    // TODO: breadth-first implementation
     // fn breadth_first(self) -> impl BreadthFirstIterable<Load, NodeId>;
 }
 

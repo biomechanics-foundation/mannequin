@@ -4,7 +4,6 @@ use itertools::{izip, Itertools};
 use rayon::prelude::*;
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
-// TODO maybe make precision generic
 pub trait Differentiable {
     type Data<'a>
     where
@@ -13,7 +12,6 @@ pub trait Differentiable {
     /// returns a reference to the internal data type
     fn jacobian(&self) -> Self::Data<'_>;
 
-    // TODO
     /// compute the jacobian matrix
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<I>, selected_effectors: &HashSet<I>)
     where
@@ -116,7 +114,7 @@ impl Differentiable for VecJacobian {
         self.data
             // .iter_mut()
             .chunks_mut(self.rows)
-            // TODO use rayon: into_par_iter()
+            // TODO use rayon
             .zip(
                 nodes_trafos
                     .iter()

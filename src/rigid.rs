@@ -4,6 +4,8 @@ use std::{fmt::Debug, hash::Hash};
 
 use crate::Nodelike;
 
+// TODO Refactoring: Move Rigid to mannequin.rs. put remainder in forward.rs module together with the trait
+
 /// A Rigid Body represents a single, rigid link connected to other links via a joint.
 /// Synonyms: Bone
 ///
@@ -17,7 +19,7 @@ pub trait Rigid: PartialEq {
     /// typically joint positions (angles/extension), f64, \[f64,3\]
     type Parameter;
 
-    // TODO Explain why this is defined on Rigid (the node) and not Mannequin (the tree) .. in short, otherwise this would be another generic and mannequin.rs would be unreadable because of trait bounds. This way it is quite elegant
+    // TODO Explain why this is defined on Rigid (the node) and not Mannequin (the tree) .. in short: otherwise this would be another generic and mannequin.rs would be unreadable because of trait bounds. This way it is quite elegant
     type NodeId: Eq + Hash + Clone + Debug;
 
     /// Get the Transformation from the parent taking the connecting joint into account
@@ -85,6 +87,8 @@ where
     Some((node, current))
 }
 
+// TODO: Move to forward.rs module
+
 ///  Trait that adds an `accumulate` functions for accumulating transformations from direct path from a root to a node.
 /// Wraps a zip and scan operation
 ///
@@ -101,7 +105,6 @@ where
 }
 
 impl<'a, Node, Load, NodeRef, T> TransformationAccumulation<'a, Node, Load, NodeRef> for T
-//Box<dyn Iterator<Item = &'a Node> + 'b>
 where
     Node: Nodelike<Load, NodeRef> + 'a,
     Load: Rigid,

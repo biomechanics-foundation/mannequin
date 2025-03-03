@@ -44,10 +44,6 @@ where
     ) -> Self::Parameter;
 }
 
-// pub trait Differential<T>: Inverse<T> {
-//     fn get_jacobian(&self, tree: IT, param: Self::Parameter, roots: &[IT::NodeRef]) -> Self::Array;
-// }
-
 /// Struct for holding the composition of character animation algorithms in a flat architecture for
 /// character animation.
 pub struct Mannequin<IT, RB, FK, IK>

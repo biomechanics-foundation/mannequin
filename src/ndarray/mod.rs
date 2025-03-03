@@ -151,8 +151,6 @@ pub fn cross_3d<T>(
     if a.len() != 3 || b.len() != 3 || target.len() != 3 {
         Err(ShapeError::from_kind(IncompatibleShape).into())
     } else {
-        // TODO, is vec slower than
-
         target[0] = a[1] * b[2] - a[2] * b[1];
         target[1] = a[2] * b[0] - a[0] * b[2];
         target[2] = a[0] * b[1] - a[1] * b[0];

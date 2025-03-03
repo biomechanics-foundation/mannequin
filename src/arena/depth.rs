@@ -100,7 +100,6 @@ impl<'a, T, N> DepthFirstIterator<'a, '_, T, N>
 where
     T: 'static + Debug + PartialEq,
 {
-    // TODO did not manage to over write the root nodes :(
     pub fn new(tree: &'a DirectedArenaTree<T, N>, root: ArenaIndex) -> Self {
         let stack = Vec::with_capacity(tree.max_depth);
         println!("Creating new depth-first iterator (slow)");
@@ -253,8 +252,6 @@ mod tests {
 
         let result = tree.iter_sub(second_node).map(|i| *i.get()).collect_vec();
         assert_eq!(result, &[5, 6]);
-
-        // TODO Check whether bread-first works (this will already use the cache as optimize has been called)
     }
 
     #[test]

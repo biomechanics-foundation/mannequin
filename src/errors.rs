@@ -17,14 +17,6 @@ pub enum MannequinError<NodeID> {
     #[cfg(feature = "ndarray")]
     #[error("Error raised by NDArray: ")]
     ShapeError(#[from] ndarray::ShapeError),
-    // TODO Errors specific to nalgebra
-    // TODO Errors specific to faer
+    // Add errors specific to nalgebra
+    // Add errors specific to faer
 }
-
-// /// Order of iteration
-// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// pub enum Order {
-//     DepthFirst,
-//     BreadthFirst,
-//     // Unordered,
-// }
