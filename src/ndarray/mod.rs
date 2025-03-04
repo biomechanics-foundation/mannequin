@@ -1,4 +1,5 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
+use crate::differentiable::ComputeSelection;
 use crate::{DepthFirstIterable, Differentiable, MannequinError, Rigid, VecJacobian};
 use ndarray::Order;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
@@ -33,11 +34,11 @@ impl Differentiable for Jacobian {
         result
     }
 
-    fn data(&mut self) -> &mut [f64] {
-        self.base.data()
-    }
+    // fn data(&mut self) -> &mut [f64] {
+    //     self.base.data()
+    // }
 
-    fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>)
+    fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<&I>, active_points: &HashSet<&I>)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid,
@@ -54,13 +55,17 @@ impl Differentiable for Jacobian {
         self.base.cols()
     }
 
-    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter])
+    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter], selection: ComputeSelection)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid,
         I: Eq + Clone + Hash + Debug,
     {
-        self.base.compute(tree, params)
+        self.base.compute(tree, params, selection)
+    }
+
+    fn configuration(&self) -> Self::Data<'_> {
+        todo!()
     }
 }
 

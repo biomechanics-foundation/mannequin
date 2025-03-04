@@ -60,7 +60,12 @@ impl Rigid for DummyBody {
         _joint: &Self,
         _joint_pose: &Self::Transformation,
         _target_buffer: &mut [f64],
+        offset: usize,
     ) {
+        todo!()
+    }
+
+    fn configuration(&self, pose: &Self::Transformation, target_buffer: &mut [f64], offset: usize) {
         todo!()
     }
 }

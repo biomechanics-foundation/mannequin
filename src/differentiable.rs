@@ -4,6 +4,14 @@ use itertools::{izip, Itertools};
 use rayon::prelude::*;
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
+pub enum ComputeSelection {
+    ConfigurationOnly,
+    JacobianOnly,
+    All,
+}
+
+// todo move the `where` clauses up here. if it works
+/// A kinematic model that can compute a configuration and its partial derivties (Jacobian matrix)
 pub trait Differentiable {
     type Data<'a>
     where
@@ -11,21 +19,22 @@ pub trait Differentiable {
 
     /// returns a reference to the internal data type
     fn jacobian(&self) -> Self::Data<'_>;
+    fn configuration(&self) -> Self::Data<'_>;
 
     /// compute the jacobian matrix
-    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<I>, selected_effectors: &HashSet<I>)
-    where
-        T: DepthFirstIterable<R, I>,
-        R: Rigid,
-        I: Eq + Clone + Hash + Debug;
-    fn compute<T, R, I>(&mut self, tree: &T, params: &[R::Parameter])
+    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<&I>, selected_effectors: &HashSet<&I>)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid,
         I: Eq + Clone + Hash + Debug;
 
-    /// provide a reference to the raw data and the dimensions of its axes (so first the major axis)
-    fn data(&mut self) -> &mut [f64];
+    /// Compute is necessary as the structure holds the memory for the jacobian and the forward vector
+    fn compute<T, R, I>(&mut self, tree: &T, params: &[R::Parameter], selection: ComputeSelection)
+    where
+        T: DepthFirstIterable<R, I>,
+        R: Rigid,
+        I: Eq + Clone + Hash + Debug;
+
     fn rows(&self) -> usize;
     fn cols(&self) -> usize;
 }
@@ -35,10 +44,11 @@ pub trait Differentiable {
 /// a rust vector instead. All backends can operate on this structure without copying the data.
 #[derive(Debug, Default)]
 pub struct VecJacobian {
-    data: Vec<f64>,
+    matrix: Vec<f64>,
+    configuration: Vec<f64>,
     rows: usize,
     cols: usize,
-    /// row index at which each effector note starts
+    /// row index at which each effector node starts. Same length as nodes!
     offsets: Vec<usize>,
     selected_joints: Vec<bool>,
     selected_effectors: Vec<bool>,
@@ -54,10 +64,15 @@ impl Differentiable for VecJacobian {
     type Data<'a> = &'a Vec<f64>;
 
     fn jacobian(&self) -> Self::Data<'_> {
-        &self.data
+        &self.matrix
     }
 
-    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<I>, selected_effectors: &HashSet<I>)
+    fn configuration(&self) -> Self::Data<'_> {
+        &self.configuration
+    }
+
+    // TODO accept slice and create the hashset internally
+    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<&I>, selected_effectors: &HashSet<&I>)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid,
@@ -79,13 +94,16 @@ impl Differentiable for VecJacobian {
         self.rows = self.offsets.iter().sum();
         self.cols = self.selected_joints.iter().filter(|&selected| *selected).count();
 
-        self.data.clear();
-        self.data.resize(self.rows * self.cols, 0.0f64);
+        self.matrix.clear();
+        self.matrix.resize(self.rows * self.cols, 0.0f64);
+
+        self.configuration.clear();
+        self.configuration.resize(self.cols, 0.0f64);
     }
 
-    fn data(&mut self) -> &mut [f64] {
-        &mut self.data
-    }
+    // fn data(&mut self) -> &mut [f64] {
+    //     &mut self.data
+    // }
 
     fn rows(&self) -> usize {
         self.rows
@@ -95,7 +113,7 @@ impl Differentiable for VecJacobian {
         self.cols
     }
 
-    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter])
+    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter], selection: ComputeSelection)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid,
@@ -109,38 +127,48 @@ impl Differentiable for VecJacobian {
             .map(|(idx, (node, trafo))| (idx, node, trafo)) // flatten
             .collect_vec();
 
-        // nomenclature (as in https://stats.stackexchange.com/a/588492): row-, column-, tube fibers
-
-        self.data
-            // .iter_mut()
-            .chunks_mut(self.rows)
-            // TODO use rayon
-            .zip(
-                nodes_trafos
-                    .iter()
-                    .zip(self.selected_joints.iter()) // Add the selected joint lists
-                    .filter_map(|(x, selected)| if *selected { Some(x) } else { None }), // filter inactive joints and remove flag
-                                                                                         // .par_iter()
-            )
-            .for_each(|(col, (idx, joint_node, joint_pose))| {
-                izip!(
-                    tree.iter_sub(joint_node), // iterating over the child tree
-                    // zipping the corresponding trafos (by skipping until the current node) and the offsets in the column
-                    // Using the index here is ok, keeping an iterator is to hard (gets mutated in a different closure)
-                    nodes_trafos.iter().skip(*idx).map(|(_, _, trafo)| trafo),
-                    self.offsets.iter().skip(*idx),
-                    self.selected_effectors.iter().skip(*idx)
-                )
-                .filter(|(_, _, _, selected)| **selected)
-                .for_each(|(effector_node, effector_pose, offset, _)| {
-                    // The slice of the colum is itself a column-first matrix
-                    effector_node.get().partial_derivative(
-                        effector_pose,
-                        joint_node.get(),
-                        joint_pose,
-                        &mut col[*offset..*offset + effector_node.get().effector_size()],
-                    );
+        if matches!(selection, ComputeSelection::ConfigurationOnly | ComputeSelection::All) {
+            izip!(&nodes_trafos, &self.selected_joints, &self.offsets)
+                .filter_map(|(x, selected, offset)| if *selected { Some((x, offset)) } else { None })
+                .for_each(|((_, node, pose), offset)| {
+                    node.get().configuration(pose, &mut self.configuration, *offset);
                 });
-            });
+        }
+
+        if matches!(selection, ComputeSelection::JacobianOnly | ComputeSelection::All) {
+            self.matrix
+                // .iter_mut()
+                .chunks_mut(self.rows)
+                // TODO use rayon
+                .zip(
+                    nodes_trafos
+                        .iter()
+                        .zip(self.selected_joints.iter()) // Add the selected joint lists
+                        .filter_map(|(x, selected)| if *selected { Some(x) } else { None }), // filter inactive joints and remove flag
+                                                                                             //par_iter()
+                )
+                .for_each(|(col, (idx, joint_node, joint_pose))| {
+                    izip!(
+                        tree.iter_sub(joint_node), // iterating over the child tree
+                        // zipping the corresponding trafos (by skipping until the current node) and the offsets in the column
+                        // Using the index here is ok, keeping an iterator is to hard (gets mutated in a different closure)
+                        nodes_trafos.iter().skip(*idx).map(|(_, _, trafo)| trafo),
+                        self.offsets.iter().skip(*idx),
+                        self.selected_effectors.iter().skip(*idx)
+                    )
+                    .filter(|(_, _, _, selected)| **selected)
+                    .for_each(|(effector_node, effector_pose, offset, _)| {
+                        // The slice of the colum is itself a column-first matrix
+                        effector_node.get().partial_derivative(
+                            effector_pose,
+                            joint_node.get(),
+                            joint_pose,
+                            col,
+                            // &mut col[*offset..*offset + effector_node.get().effector_size()],
+                            *offset,
+                        );
+                    });
+                });
+        }
     }
 }

@@ -15,6 +15,7 @@ where
     fn solve(&mut self, tree: &IT, params: &[RB::Parameter]) -> Vec<RB::Transformation>;
 }
 
+/// Default forward kinematics that wraps a [Differentiable] kinematics model.
 pub struct ForwardsKinematics<RB>
 where
     RB: Rigid,

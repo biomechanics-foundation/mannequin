@@ -119,9 +119,12 @@ impl Rigid for Bone {
         pose: &Self::Transformation,
         joint: &Self,
         joint_pose: &Self::Transformation,
-        target_buffer: &mut [f64],
+        buffer: &mut [f64],
+        offset: usize,
     ) {
         // Formula: axis_in_world x (end_effector_world - pivod_in_world)
+
+        // TODO: even this code might be generalized
         let local_axis = match &joint.axis {
             Axis::RotationX => &array![1.0, 0.0, 0.0, 0.0],
             Axis::RotationY => &array![0.0, 1.0, 0.0, 0.0],
@@ -141,12 +144,17 @@ impl Rigid for Bone {
         }
         let lever = &pose.slice(s![0..3, 3]) - &joint_pose.slice(s![0..3, 3]);
 
+        let target_buffer = &mut buffer[offset..offset + self.effector_size()];
         cross_3d::<Self::NodeId>(
             axis_global.slice(s![0..3]),
             lever.view(),
             ArrayViewMut1::from(target_buffer),
         )
         .unwrap();
+    }
+
+    fn configuration(&self, pose: &Self::Transformation, target_buffer: &mut [f64], offset: usize) {
+        todo!()
     }
 }
 
@@ -188,6 +196,7 @@ pub struct DifferentialIK {
 mod tests {
     use super::super::Jacobian;
     use super::{Axis, Bone, DifferentialIK, LinkNodeId};
+    use crate::differentiable::ComputeSelection;
     use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable, Forward, Rigid};
     use crate::{Differentiable, ForwardsKinematics};
     use approx::assert_abs_diff_eq;
@@ -253,19 +262,20 @@ mod tests {
         jacobian.setup(
             &tree,
             &[
-                "link1".to_string(),
-                "link2".to_string(),
-                "link3".to_string(),
-                "link4".to_string(),
+                &"link1".to_string(),
+                &"link2".to_string(),
+                &"link3".to_string(),
+                &"link4".to_string(),
             ]
             .into(),
             // TODO automatically those that have an effector defined
-            &["link2".to_string(), "link4".to_string()].into(),
+            &[&"link2".to_string(), &"link4".to_string()].into(),
         );
 
         jacobian.compute(
             &tree,
             &[0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2],
+            ComputeSelection::JacobianOnly,
         );
 
         let target = array![

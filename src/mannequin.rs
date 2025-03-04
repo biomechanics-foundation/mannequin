@@ -39,14 +39,20 @@ pub trait Rigid: PartialEq {
     /// pose: This node's FoR in global coordinates
     /// joint: Reference to the joint node
     /// joint_pose: the joint's FoR in global coordinates
-    /// target_buffer: Memory location to where the results are written too.
+    /// target_buffer: Memory location to where the results are written to. The implementation is responsible of taking care only that
+    /// correct location in the buffer is written to (e.g.,
+    /// `[offset..offset + self.effector_size()]`)
+    /// offset: Start positin in the buffer to write to
     fn partial_derivative(
         &self,
         pose: &Self::Transformation,
         joint: &Self,
         joint_pose: &Self::Transformation,
         target_buffer: &mut [f64],
+        offset: usize,
     );
+
+    fn configuration(&self, pose: &Self::Transformation, target_buffer: &mut [f64], offset: usize);
 
     /// number of effectors
     fn effector_count(&self) -> usize;
@@ -75,9 +81,10 @@ where
     IT: DepthFirstIterable<RB, RB::NodeId>,
 
     FK: Forward<IT, RB>,
-    IK: Inverse<IT, RB, FK>,
+    IK: Inverse<IT, RB>,
 {
     pub tree: IT,
+    // TODO: make this a vec/hashmap of IK FK, to provide a higher level interface
     pub fk: FK,
     pub ik: IK,
     rigid_body: PhantomData<RB>,
@@ -88,7 +95,7 @@ where
     RB: Rigid,
     IT: DepthFirstIterable<RB, RB::NodeId>,
     FK: Forward<IT, RB>,
-    IK: Inverse<IT, RB, FK>,
+    IK: Inverse<IT, RB>,
 {
     pub fn new(tree: IT, foward_kinematics: FK, inverse_kinematics: IK) -> Self {
         Mannequin {
@@ -108,12 +115,7 @@ where
     }
 
     /// Inverse kinematics for the targets in `target_refs` and the desired working space coordinates in `target_val`.
-    pub fn inverse(
-        &mut self,
-        param: IK::Parameter,
-        target_refs: &[RB::NodeId],
-        target_val: &[IK::Array],
-    ) -> IK::Parameter {
-        self.ik.solve(&self.tree, &self.fk, param, target_refs, target_val)
+    pub fn inverse(&mut self, param: &mut [RB::Parameter], target_val: &[RB::Point]) -> IK::Info {
+        self.ik.solve(&self.tree, param, target_val)
     }
 }
