@@ -10,7 +10,6 @@ pub enum ComputeSelection {
     All,
 }
 
-// todo move the `where` clauses up here. if it works
 /// A kinematic model that can compute a configuration and its partial derivties (Jacobian matrix)
 pub trait Differentiable {
     type Data<'a>
@@ -38,12 +37,13 @@ pub trait Differentiable {
     fn rows(&self) -> usize;
     fn cols(&self) -> usize;
 }
+// Note: Won't make the trait itself generic. That would be cleaner but mean more overhead (i.e., requiring full qualifiers in compositions)
 
 /// Base implementation that should be used in backend implementation as a composite.
 /// The composition of the Jacobian does not require a specific backend and can directly operate on
 /// a rust vector instead. All backends can operate on this structure without copying the data.
 #[derive(Debug, Default)]
-pub struct VecJacobian {
+pub struct DifferentiableVecModel {
     matrix: Vec<f64>,
     configuration: Vec<f64>,
     rows: usize,
@@ -54,13 +54,13 @@ pub struct VecJacobian {
     selected_effectors: Vec<bool>,
 }
 
-impl VecJacobian {
+impl DifferentiableVecModel {
     pub fn new() -> Self {
         Self { ..Default::default() }
     }
 }
 
-impl Differentiable for VecJacobian {
+impl Differentiable for DifferentiableVecModel {
     type Data<'a> = &'a Vec<f64>;
 
     fn jacobian(&self) -> Self::Data<'_> {

@@ -1,8 +1,10 @@
 /*! Defines the payload carried by [Nodelike] in the context of kinematics/character animation */
 
+use std::collections::HashSet;
+
 use itertools::Itertools;
 
-use crate::{mannequin::Rigid, DepthFirstIterable, Nodelike};
+use crate::{differentiable, mannequin::Rigid, DepthFirstIterable, Differentiable, Nodelike};
 
 /// Trait representing a stateful forward kinematics algoritm. For instance, it can represent a rigid body mannequin
 /// (e.g., a robot) or softbody/skinning for character animation.
@@ -42,23 +44,12 @@ where
     RB: Rigid,
 {
     fn solve(&mut self, tree: &IT, params: &[<RB as Rigid>::Parameter]) -> Vec<<RB as Rigid>::Transformation> {
-        // TODO Optimization: use Vec<bool> instead of checking for target refs! Order of descent cannot change
-
-        tree.iter()
-            .accumulate_transformations(params, self.max_depth)
-            .filter_map(|(node, trafo)| {
-                if self.target_refs.is_empty() || self.target_refs.contains(&node.id()) {
-                    Some(trafo)
-                } else {
-                    None
-                }
-            })
-            .collect_vec()
+        todo!()
+        // not the same retun type as DifferentiableModel
     }
 
-    fn initialize(&mut self, _tree: &IT, target_refs: &[<RB as Rigid>::NodeId]) {
-        self.target_refs.clear();
-        self.target_refs.extend_from_slice(target_refs);
+    fn initialize(&mut self, tree: &IT, selected_effectors: &[<RB as Rigid>::NodeId]) {
+        todo!()
     }
 }
 

@@ -1,6 +1,6 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
 use crate::differentiable::ComputeSelection;
-use crate::{DepthFirstIterable, Differentiable, MannequinError, Rigid, VecJacobian};
+use crate::{DepthFirstIterable, Differentiable, DifferentiableVecModel, MannequinError, Rigid};
 use ndarray::Order;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
 use std::collections::HashSet;
@@ -12,7 +12,7 @@ pub mod default;
 /// Jacobian using ndarray for numerics
 #[derive(Debug, Default)]
 pub struct Jacobian {
-    base: VecJacobian,
+    base: DifferentiableVecModel,
 }
 
 /// Thin wrapper around the default implementation

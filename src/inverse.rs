@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 
-use crate::{DepthFirstIterable, Differentiable, Nodelike, Rigid};
+use crate::{differentiable::ComputeSelection, DepthFirstIterable, Differentiable, Nodelike, Rigid};
 
 /// Trait representing a stateful inverse kinematics algoritm.
 pub trait Inverse<IT, RB>
@@ -22,36 +22,36 @@ struct InverseKinematicsInfo {
 }
 
 /// Reference implementation that is agnostic of the backend
-struct DifferentialInverseKinematics<J>
+struct DifferentialInverseKinematics<DM>
 where
-    J: Differentiable, // TODO sync somehow the assiciate types
+    DM: Differentiable, // TODO sync somehow the assiciate types
 {
     max_depth: usize,
     max_iterations_count: usize,
     selected_effectors: Vec<bool>,
     // MAybe a parameter to accept distances
-    jacobian: J,
+    model: DM,
 }
 
-impl<J> DifferentialInverseKinematics<J>
+impl<DM> DifferentialInverseKinematics<DM>
 where
-    J: Differentiable,
+    DM: Differentiable,
 {
-    pub fn new(max_depth: usize, max_iterations_count: usize, jacobian: J) -> Self {
+    pub fn new(max_depth: usize, max_iterations_count: usize, jacobian: DM) -> Self {
         Self {
             max_depth,
             max_iterations_count,
             selected_effectors: vec![],
-            jacobian,
+            model: jacobian,
         }
     }
 }
 
-impl<RB, IT, J> Inverse<IT, RB> for DifferentialInverseKinematics<J>
+impl<RB, IT, DM> Inverse<IT, RB> for DifferentialInverseKinematics<DM>
 where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid,
-    J: Differentiable,
+    DM: Differentiable,
 {
     type Info = InverseKinematicsInfo;
 
@@ -63,14 +63,16 @@ where
     ) {
         let selected_effectors = HashSet::from_iter(selected_effectors);
         let selected_joints = HashSet::from_iter(selected_joints);
-        self.jacobian.setup(tree, &selected_joints, &selected_effectors);
+        self.model.setup(tree, &selected_joints, &selected_effectors);
 
         // TODO: this should work! maybe after linking the associate in differentiable
         // self.jacobian
         //     .setup(tree, selected_joints.into(), (&selected_effectors).into());
     }
 
-    fn solve(&mut self, tree: &IT, param: &mut [<RB as Rigid>::Parameter], targets: &[RB::Point]) -> Self::Info {
+    fn solve(&mut self, tree: &IT, params: &mut [<RB as Rigid>::Parameter], targets: &[RB::Point]) -> Self::Info {
+        self.model.compute(tree, params, ComputeSelection::All);
+
         // Loop until convergence or max_distance
         //  compute Jacobian
         //  vec = compute FK - targets

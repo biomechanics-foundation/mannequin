@@ -33,7 +33,7 @@ pub mod mannequin;
 pub use arena::{
     BreadthFirstIterable, DepthFirstArenaTree, DepthFirstIterable, DirectedArenaTree, DirectionIterable, Nodelike,
 };
-pub use differentiable::{Differentiable, VecJacobian};
+pub use differentiable::{Differentiable, DifferentiableVecModel};
 pub use errors::MannequinError;
 pub use forward::{Forward, ForwardsKinematics};
 pub use inverse::Inverse;
