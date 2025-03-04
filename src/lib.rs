@@ -24,7 +24,6 @@
 
 pub mod arena;
 pub mod differentiable;
-pub mod dummy;
 pub mod errors;
 pub mod forward;
 pub mod inverse;

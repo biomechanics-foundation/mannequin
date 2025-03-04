@@ -2,8 +2,8 @@
 #![allow(unused_variables)]
 
 use super::{
-    cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4, translate_x_4x4, translate_y_4x4,
-    translate_z_4x4,
+    cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4, solve_linear, translate_x_4x4,
+    translate_y_4x4, translate_z_4x4,
 };
 use crate::Rigid;
 use core::fmt;
@@ -155,6 +155,17 @@ impl Rigid for Segment {
 
     fn configuration(&self, pose: &Self::Transformation, target_buffer: &mut [f64], offset: usize) {
         todo!()
+    }
+
+    fn solve_linear(
+        matrix: &[f64],
+        rows: usize,
+        cols: usize,
+        vector: &[f64],
+        elements: usize,
+        target_buffer: &mut [f64],
+    ) {
+        solve_linear(matrix, rows, cols, vector, elements, target_buffer);
     }
 }
 

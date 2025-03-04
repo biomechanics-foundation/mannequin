@@ -162,3 +162,14 @@ pub fn cross_3d<T>(
         Ok(())
     }
 }
+
+pub fn solve_linear(
+    matrix: &[f64],
+    rows: usize,
+    cols: usize,
+    vector: &[f64],
+    elements: usize,
+    target_buffer: &mut [f64],
+) {
+    todo!()
+}
