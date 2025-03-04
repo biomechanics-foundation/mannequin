@@ -31,14 +31,14 @@ pub enum Mode {
 }
 
 #[derive(Debug, Default, PartialEq)]
-pub struct Bone {
+pub struct Segment {
     link: Array2<f64>,
     axis: Axis,
     mode: Mode,
     effector: Option<Array2<f64>>,
 }
 
-impl Bone {
+impl Segment {
     pub fn new(from_parent: &Array2<f64>, axis: Axis, effector: Option<Array2<f64>>) -> Self {
         Self {
             link: from_parent.clone(),
@@ -49,13 +49,13 @@ impl Bone {
     }
 }
 
-impl fmt::Display for Bone {
+impl fmt::Display for Segment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Bone, link: {}, Axis: {:?}", self.link, self.axis)
     }
 }
 
-impl Rigid for Bone {
+impl Rigid for Segment {
     type Transformation = Array2<f64>;
 
     type Point = Array1<f64>;
@@ -160,7 +160,7 @@ impl Rigid for Bone {
 
 // TODO move solvers to dedicated module
 
-pub type LinkNodeId = <Bone as Rigid>::NodeId;
+pub type LinkNodeId = <Segment as Rigid>::NodeId;
 
 pub struct DifferentialIK {
     #[allow(dead_code)]
@@ -195,7 +195,7 @@ pub struct DifferentialIK {
 #[cfg(test)]
 mod tests {
     use super::super::Jacobian;
-    use super::{Axis, Bone, DifferentialIK, LinkNodeId};
+    use super::{Axis, DifferentialIK, LinkNodeId, Segment};
     use crate::differentiable::ComputeSelection;
     use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable, Forward, Rigid};
     use crate::{Differentiable, ForwardsKinematics};
@@ -205,16 +205,16 @@ mod tests {
 
     #[test]
     fn test_fk() {
-        let mut fk = ForwardsKinematics::<Bone>::new(10);
-        let mut tree = DirectedArenaTree::<Bone, LinkNodeId>::new();
+        let mut fk = ForwardsKinematics::<Segment>::new(10);
+        let mut tree = DirectedArenaTree::<Segment, LinkNodeId>::new();
 
-        let mut trafo = Bone::neutral_element();
+        let mut trafo = Segment::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
 
-        let link1 = Bone::new(&trafo, Axis::RotationZ, None);
-        let link2 = Bone::new(&trafo, Axis::RotationZ, None);
-        let link3 = Bone::new(&trafo, Axis::RotationZ, None);
-        let link4 = Bone::new(&trafo, Axis::RotationZ, None);
+        let link1 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link2 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link3 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link4 = Segment::new(&trafo, Axis::RotationZ, None);
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
@@ -238,15 +238,15 @@ mod tests {
     #[test]
     fn test_jacobian() {
         let ik = DifferentialIK { max_depth: 10 };
-        let mut tree = DirectedArenaTree::<Bone, LinkNodeId>::new();
+        let mut tree = DirectedArenaTree::<Segment, LinkNodeId>::new();
 
-        let mut trafo = Bone::neutral_element();
+        let mut trafo = Segment::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
 
-        let link1 = Bone::new(&trafo, Axis::RotationZ, None);
-        let link2 = Bone::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
-        let link3 = Bone::new(&trafo, Axis::RotationZ, None);
-        let link4 = Bone::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+        let link1 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link2 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+        let link3 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link4 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
