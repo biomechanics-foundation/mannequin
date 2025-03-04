@@ -4,6 +4,8 @@
  * realistic joints, muscle simulation, or classical inverse kinematics and obstacle avoidance.
  */
 
+use num_traits::Float;
+
 use crate::{DepthFirstIterable, Forward, Inverse};
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
@@ -17,14 +19,19 @@ pub trait Rigid: PartialEq {
     type Transformation: Clone + Debug;
     /// Vec, \[f64;4\], ...
     type Point;
-    /// typically joint positions (angles/extension), f64, \[f64,3\]
-    type Parameter;
+    // /// typically joint positions (angles/extension), f64, \[f64,3\]
+    // type Parameter;
+    type FloatType: Float;
 
     // TODO Explain why this is defined on Rigid (the node) and not Mannequin (the tree) .. in short: otherwise this would be another generic and mannequin.rs would be unreadable because of trait bounds. This way it is quite elegant
     type NodeId: Eq + Hash + Clone + Debug;
 
     /// Get the Transformation from the parent taking the connecting joint into account
-    fn transform(&self, params: &Self::Parameter) -> Self::Transformation;
+    /// Note: This method receives all parameters and it's in the implementing structs
+    /// responsibility to address the correct value (via `index`). This decision has been
+    /// made to allow for the implementation of custom multivariate joints (e.g., a realistic
+    /// shoulder joint).
+    fn transform(&self, params: &[Self::FloatType], index: usize) -> Self::Transformation;
 
     /// Transform a point into the world coordinate system
     fn globalize(&self, other: &Self::Point) -> Self::Point;
@@ -72,7 +79,7 @@ pub trait Rigid: PartialEq {
     /// Concat two transformations
     fn concat(first: &Self::Transformation, second: &Self::Transformation) -> Self::Transformation;
 
-    fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [f64]);
+    fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [Self::FloatType]);
 }
 
 /// Struct for holding the composition of character animation algorithms in a flat architecture for
@@ -111,13 +118,14 @@ where
     /// Forward kinematics for the targets in `target_refs` and the joint positions in `param`.
     pub fn forward(
         &mut self,
-        param: &[RB::Parameter], /*, target_refs: &[RB::NodeId]*/
+        param: &[RB::FloatType], /*, target_refs: &[RB::NodeId]*/
     ) -> Vec<RB::Transformation> {
         self.fk.solve(&self.tree, param)
     }
 
     /// Inverse kinematics for the targets in `target_refs` and the desired working space coordinates in `target_val`.
-    pub fn inverse(&mut self, param: &mut [RB::Parameter], target_val: &[RB::Point]) -> IK::Info {
-        self.ik.solve(&self.tree, param, target_val)
+    pub fn inverse(&mut self, param: &mut [RB::FloatType], target_val: &[RB::Point]) -> IK::Info {
+        // self.ik.solve(&self.tree, param, target_val)
+        todo!()
     }
 }

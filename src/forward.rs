@@ -14,7 +14,7 @@ where
     RB: Rigid,
 {
     fn initialize(&mut self, tree: &IT, target_refs: &[RB::NodeId]);
-    fn solve(&mut self, tree: &IT, params: &[RB::Parameter]) -> Vec<RB::Transformation>;
+    fn solve(&mut self, tree: &IT, params: &[RB::FloatType]) -> Vec<RB::Transformation>;
 }
 
 /// Default forward kinematics that wraps a [Differentiable] kinematics model.
@@ -43,7 +43,7 @@ where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid,
 {
-    fn solve(&mut self, tree: &IT, params: &[<RB as Rigid>::Parameter]) -> Vec<<RB as Rigid>::Transformation> {
+    fn solve(&mut self, tree: &IT, params: &[<RB as Rigid>::FloatType]) -> Vec<<RB as Rigid>::Transformation> {
         todo!()
         // not the same retun type as DifferentiableModel
     }
@@ -53,40 +53,16 @@ where
     }
 }
 
-/// Helper function to be used in [std::iter::Scan] for accumulating transformations from direct path from a root to a node
-pub fn accumulate<'a, Node, Load, NodeRef>(
-    stack: &mut Vec<Load::Transformation>,
-    arg: (&'a Node, &Load::Parameter),
-) -> Option<(&'a Node, Load::Transformation)>
-where
-    Node: Nodelike<Load, NodeRef>,
-    Load: Rigid,
-{
-    let (node, param) = arg;
-    while node.depth() < stack.len() {
-        stack.pop();
-    }
-    let current = Load::concat(
-        stack.last().unwrap_or(&Load::neutral_element()),
-        &node.get().transform(param),
-    );
-    stack.push(current.clone());
-    Some((node, current))
-}
-
-// TODO: Move to forward.rs module
-
-///  Trait that adds an `accumulate` functions for accumulating transformations from direct path from a root to a node.
-/// Wraps a zip and scan operation
-///
+/// Trait that adds an `accumulate` functions for accumulating transformations from direct path from a root to a node.
+/// Implemented for an iterator over nodes but should only be used on a depth-first iteration (not enforced!)
 pub trait TransformationAccumulation<'a, Node, Load, NodeRef>
 where
     Load: Rigid,
     Node: Nodelike<Load, NodeRef> + 'a,
 {
-    fn accumulate_transformations(
+    fn accumulate(
         self,
-        param: &[Load::Parameter],
+        params: &[Load::FloatType],
         max_depth: usize,
     ) -> impl Iterator<Item = (&'a Node, Load::Transformation)>;
 }
@@ -97,14 +73,25 @@ where
     Load: Rigid,
     T: Iterator<Item = &'a Node>,
 {
-    fn accumulate_transformations(
+    fn accumulate(
         self,
-        param: &[Load::Parameter],
+        params: &[Load::FloatType],
         max_depth: usize,
     ) -> impl Iterator<Item = (&'a Node, <Load as Rigid>::Transformation)> {
-        self.into_iter()
-            .zip(param.iter())
-            .scan(Vec::<Load::Transformation>::with_capacity(max_depth), accumulate)
+        self.into_iter().enumerate().scan(
+            Vec::<Load::Transformation>::with_capacity(max_depth),
+            |stack, (index, node)| {
+                while node.depth() < stack.len() {
+                    stack.pop();
+                }
+                let current = Load::concat(
+                    stack.last().unwrap_or(&Load::neutral_element()),
+                    &node.get().transform(params, index),
+                );
+                stack.push(current.clone());
+                Some((node, current))
+            },
+        )
     }
 }
 #[cfg(test)]

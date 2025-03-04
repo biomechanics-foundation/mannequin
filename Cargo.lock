@@ -533,6 +533,7 @@ dependencies = [
  "itertools",
  "nalgebra",
  "ndarray",
+ "num-traits",
  "rayon",
  "test-log",
  "thiserror 2.0.10",

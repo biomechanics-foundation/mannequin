@@ -28,7 +28,7 @@ pub trait Differentiable {
         I: Eq + Clone + Hash + Debug;
 
     /// Compute is necessary as the structure holds the memory for the jacobian and the forward vector
-    fn compute<T, R, I>(&mut self, tree: &T, params: &[R::Parameter], selection: ComputeSelection)
+    fn compute<T, R, I>(&mut self, tree: &T, params: &[R::FloatType], selection: ComputeSelection)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid,
@@ -39,7 +39,7 @@ pub trait Differentiable {
 }
 // Note: Won't make the trait itself generic. That would be cleaner but mean more overhead (i.e., requiring full qualifiers in compositions)
 
-/// A kinematic model that can comute a configuration
+/// A kinematic model that can compute a configuration
 /// And partial derivatives based on Vec
 ///
 /// Base implementation that should be used in backend implementation as a composite.
@@ -116,7 +116,7 @@ impl Differentiable for DifferentiableModel {
         self.cols
     }
 
-    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter], selection: ComputeSelection)
+    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::FloatType], selection: ComputeSelection)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid,
@@ -125,7 +125,7 @@ impl Differentiable for DifferentiableModel {
         // compute transformations only once
         let nodes_trafos = tree
             .iter()
-            .accumulate_transformations(params, 42)
+            .accumulate(params, 42)
             .enumerate()
             .map(|(idx, (node, trafo))| (idx, node, trafo)) // flatten
             .collect_vec();
@@ -161,7 +161,7 @@ impl Differentiable for DifferentiableModel {
                     )
                     .filter(|(_, _, _, selected)| **selected)
                     .for_each(|(effector_node, effector_pose, offset, _)| {
-                        // The slice of the colum is itself a column-first matrix
+                        // The slice of the column is itself a column-first matrix
                         effector_node.get().partial_derivative(
                             effector_pose,
                             joint_node.get(),

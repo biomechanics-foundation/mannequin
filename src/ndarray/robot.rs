@@ -60,20 +60,20 @@ impl Rigid for Segment {
 
     type Point = Array1<f64>;
 
-    type Parameter = f64;
+    type FloatType = f64;
 
     type NodeId = String;
 
-    fn transform(&self, param: &Self::Parameter) -> Self::Transformation {
+    fn transform(&self, params: &[f64], index: usize) -> Self::Transformation {
         let joint = match self.axis {
-            Axis::RotationX => rotate_x_4x4(*param),
-            Axis::RotationY => rotate_y_4x4(*param),
-            Axis::RotationZ => rotate_z_4x4(*param),
+            Axis::RotationX => rotate_x_4x4(params[index]),
+            Axis::RotationY => rotate_y_4x4(params[index]),
+            Axis::RotationZ => rotate_z_4x4(params[index]),
             // TODO implement arbitratry axis and translations
             Axis::Rotation(_) => todo!(),
-            Axis::TranslationX => translate_x_4x4(*param),
-            Axis::TranslationY => translate_y_4x4(*param),
-            Axis::TranslationZ => translate_z_4x4(*param),
+            Axis::TranslationX => translate_x_4x4(params[index]),
+            Axis::TranslationY => translate_y_4x4(params[index]),
+            Axis::TranslationZ => translate_z_4x4(params[index]),
             Axis::Translation(_) => todo!(),
         };
         self.link.dot(&joint)

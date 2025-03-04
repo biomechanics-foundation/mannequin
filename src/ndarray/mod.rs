@@ -22,6 +22,7 @@ impl Jacobian {
     }
 }
 
+// TODO Remove as IK will be sufficient
 impl Differentiable for Jacobian {
     // Note: could ArrayView too
     type Data<'a> = ArrayView2<'a, f64>;
@@ -55,7 +56,7 @@ impl Differentiable for Jacobian {
         self.base.cols()
     }
 
-    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter], selection: ComputeSelection)
+    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::FloatType], selection: ComputeSelection)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid,

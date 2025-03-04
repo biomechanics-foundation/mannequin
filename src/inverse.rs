@@ -17,7 +17,7 @@ where
 
     fn initialize(&mut self, tree: &IT, selected_joints: &[<RB as Rigid>::NodeId], selected_effectors: &[RB::NodeId]);
 
-    fn solve(&mut self, tree: &IT, param: &mut [RB::Parameter], targets: Self::Data<'_>) -> Self::Info;
+    fn solve(&mut self, tree: &IT, param: &mut [RB::FloatType], targets: Self::Data<'_>) -> Self::Info;
 }
 
 struct InverseKinematicsInfo {
@@ -70,7 +70,7 @@ where
         self.model.setup(tree, &selected_joints, &selected_effectors);
     }
 
-    fn solve(&mut self, tree: &IT, params: &mut [<RB as Rigid>::Parameter], targets: &[f64]) -> Self::Info {
+    fn solve(&mut self, tree: &IT, params: &mut [<RB as Rigid>::FloatType], targets: &[f64]) -> Self::Info {
         self.model.compute(tree, params, ComputeSelection::All);
 
         let mut counter = 0;
