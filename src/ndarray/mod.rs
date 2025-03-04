@@ -1,6 +1,6 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
 use crate::differentiable::ComputeSelection;
-use crate::{DepthFirstIterable, Differentiable, DifferentiableVecModel, MannequinError, Rigid};
+use crate::{DepthFirstIterable, Differentiable, DifferentiableModel, MannequinError, Rigid};
 use ndarray::Order;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
 use std::collections::HashSet;
@@ -12,7 +12,7 @@ pub mod robot;
 /// Jacobian using ndarray for numerics
 #[derive(Debug, Default)]
 pub struct Jacobian {
-    base: DifferentiableVecModel,
+    base: DifferentiableModel,
 }
 
 /// Thin wrapper around the default implementation
@@ -163,13 +163,6 @@ pub fn cross_3d<T>(
     }
 }
 
-pub fn solve_linear(
-    matrix: &[f64],
-    rows: usize,
-    cols: usize,
-    vector: &[f64],
-    elements: usize,
-    target_buffer: &mut [f64],
-) {
+pub fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [f64]) {
     todo!()
 }

@@ -157,15 +157,8 @@ impl Rigid for Segment {
         todo!()
     }
 
-    fn solve_linear(
-        matrix: &[f64],
-        rows: usize,
-        cols: usize,
-        vector: &[f64],
-        elements: usize,
-        target_buffer: &mut [f64],
-    ) {
-        solve_linear(matrix, rows, cols, vector, elements, target_buffer);
+    fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [f64]) {
+        solve_linear(matrix, rows, cols, vector, target_buffer);
     }
 }
 

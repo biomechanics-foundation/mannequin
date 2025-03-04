@@ -72,14 +72,7 @@ pub trait Rigid: PartialEq {
     /// Concat two transformations
     fn concat(first: &Self::Transformation, second: &Self::Transformation) -> Self::Transformation;
 
-    fn solve_linear(
-        matrix: &[f64],
-        rows: usize,
-        cols: usize,
-        vector: &[f64],
-        elements: usize,
-        target_buffer: &mut [f64],
-    );
+    fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [f64]);
 }
 
 /// Struct for holding the composition of character animation algorithms in a flat architecture for
