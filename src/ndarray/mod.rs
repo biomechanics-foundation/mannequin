@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 
-pub mod default;
+pub mod robot;
 
 /// Jacobian using ndarray for numerics
 #[derive(Debug, Default)]
