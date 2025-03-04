@@ -198,14 +198,13 @@ pub struct DifferentialIK {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Jacobian;
     use super::{Axis, DifferentialIK, LinkNodeId, Segment};
     use crate::differentiable::ComputeSelection;
-    use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable, Forward, Rigid};
+    use crate::{DepthFirstArenaTree, DifferentiableModel, DirectedArenaTree, DirectionIterable, Forward, Rigid};
     use crate::{Differentiable, ForwardsKinematics};
     use approx::assert_abs_diff_eq;
     use itertools::Itertools;
-    use ndarray::prelude::*;
+    use ndarray::{prelude::*, Order};
 
     #[test]
     fn test_fk() {
@@ -262,7 +261,8 @@ mod tests {
 
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
-        let mut jacobian = Jacobian::new();
+        let mut jacobian = DifferentiableModel::<f64>::new();
+
         jacobian.setup(
             &tree,
             &[
@@ -282,6 +282,10 @@ mod tests {
             ComputeSelection::JacobianOnly,
         );
 
+        let result = ArrayView1::<f64>::from(jacobian.jacobian())
+            .into_shape_with_order(((jacobian.rows(), jacobian.cols()), Order::ColumnMajor))
+            .unwrap();
+
         let target = array![
             [0.0, 0.0, 0.0, 0.0],
             [20.0, 10.0, 0.0, 0.0],
@@ -291,8 +295,6 @@ mod tests {
             [0.0, 0.0, 0.0, 0.0,]
         ];
 
-        // println!("{}", &jacobian.jacobian() - &target);
-
-        assert_abs_diff_eq!(jacobian.jacobian(), target, epsilon = 1e-6);
+        assert_abs_diff_eq!(result, target , epsilon = 1e-6);
     }
 }

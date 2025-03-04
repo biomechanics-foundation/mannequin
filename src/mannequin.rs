@@ -55,11 +55,11 @@ pub trait Rigid: PartialEq {
         pose: &Self::Transformation,
         joint: &Self,
         joint_pose: &Self::Transformation,
-        target_buffer: &mut [f64],
+        target_buffer: &mut [Self::FloatType],
         offset: usize,
     );
 
-    fn configuration(&self, pose: &Self::Transformation, target_buffer: &mut [f64], offset: usize);
+    fn configuration(&self, pose: &Self::Transformation, target_buffer: &mut [Self::FloatType], offset: usize);
 
     /// number of effectors
     fn effector_count(&self) -> usize;
@@ -79,7 +79,13 @@ pub trait Rigid: PartialEq {
     /// Concat two transformations
     fn concat(first: &Self::Transformation, second: &Self::Transformation) -> Self::Transformation;
 
-    fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [Self::FloatType]);
+    fn solve_linear(
+        matrix: &[Self::FloatType],
+        rows: usize,
+        cols: usize,
+        vector: &[Self::FloatType],
+        target_buffer: &mut [Self::FloatType],
+    );
 }
 
 /// Struct for holding the composition of character animation algorithms in a flat architecture for
@@ -88,7 +94,6 @@ pub struct Mannequin<IT, RB, FK, IK>
 where
     RB: Rigid,
     IT: DepthFirstIterable<RB, RB::NodeId>,
-
     FK: Forward<IT, RB>,
     IK: Inverse<IT, RB>,
 {

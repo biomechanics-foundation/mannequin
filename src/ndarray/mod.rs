@@ -9,67 +9,6 @@ use std::hash::Hash;
 
 pub mod robot;
 
-/// Jacobian using ndarray for numerics
-#[derive(Debug, Default)]
-pub struct Jacobian {
-    base: DifferentiableModel,
-}
-
-/// Thin wrapper around the default implementation
-impl Jacobian {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-// TODO Remove as IK will be sufficient
-impl Differentiable for Jacobian {
-    // Note: could ArrayView too
-    type Data<'a> = ArrayView2<'a, f64>;
-
-    fn jacobian(&self) -> Self::Data<'_> {
-        let data = self.base.jacobian();
-        let result = ArrayView1::<f64>::from(data.as_slice())
-            .into_shape_with_order(((self.base.rows(), self.base.cols()), Order::ColumnMajor))
-            .unwrap();
-        result
-    }
-
-    // fn data(&mut self) -> &mut [f64] {
-    //     self.base.data()
-    // }
-
-    fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<&I>, active_points: &HashSet<&I>)
-    where
-        T: DepthFirstIterable<R, I>,
-        R: Rigid,
-        I: Eq + Clone + Hash + Debug,
-    {
-        self.base.setup(tree, active_joints, active_points)
-    }
-
-    fn rows(&self) -> usize {
-        self.base.rows()
-    }
-
-    fn cols(&self) -> usize {
-        self.base.cols()
-    }
-
-    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::FloatType], selection: ComputeSelection)
-    where
-        T: DepthFirstIterable<R, I>,
-        R: Rigid,
-        I: Eq + Clone + Hash + Debug,
-    {
-        self.base.compute(tree, params, selection)
-    }
-
-    fn configuration(&self) -> Self::Data<'_> {
-        todo!()
-    }
-}
-
 /// Creates a homogeneous, 4x4 rotation matrix around the x axis.
 pub fn rotate_x_4x4(param: f64) -> Array2<f64> {
     array![

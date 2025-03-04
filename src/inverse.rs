@@ -1,45 +1,54 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, iter::Sum};
 
 use itertools::{izip, Itertools};
+use num_traits::Float;
 
-use crate::{
-    differentiable::ComputeSelection, DepthFirstIterable, Differentiable, DifferentiableModel, Nodelike, Rigid,
-};
+use crate::{differentiable::ComputeSelection, DepthFirstIterable, Differentiable, Rigid};
 
-/// Trait representing a stateful inverse kinematics algoritm.
+/// Trait representing a stateful inverse kinematics algorithm.
 pub trait Inverse<IT, RB>
 where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid,
 {
     type Info;
-    type Data<'a>;
 
     fn initialize(&mut self, tree: &IT, selected_joints: &[<RB as Rigid>::NodeId], selected_effectors: &[RB::NodeId]);
 
-    fn solve(&mut self, tree: &IT, param: &mut [RB::FloatType], targets: Self::Data<'_>) -> Self::Info;
+    fn solve(
+        &mut self,
+        tree: &IT,
+        param: &mut [<RB as Rigid>::FloatType],
+        targets: &[<RB as Rigid>::FloatType],
+    ) -> Self::Info;
 }
 
-struct InverseKinematicsInfo {
+struct InverseKinematicsInfo<F: Float> {
     iteration_count: usize,
-    squared_error: f64,
+    squared_error: F,
 }
 
 /// Reference implementation that is agnostic of the backend
-struct DifferentialInverseKinematics
-// TODO sync somehow the assiciate types
+struct DifferentialInverseKinematics<F, D>
+where
+    F: Float,
+    D: Differentiable<F>,
 {
     max_depth: usize,
     max_iterations_count: usize,
-    min_error: f64,
+    min_error: F,
     selected_effectors: Vec<bool>,
     // TODO: I want this to be generic but this fails when binding the GATs
-    model: DifferentiableModel,
+    model: D,
     // model: DM,
 }
 
-impl DifferentialInverseKinematics {
-    pub fn new(max_depth: usize, max_iterations_count: usize, min_error: f64, jacobian: DifferentiableModel) -> Self {
+impl<F, D> DifferentialInverseKinematics<F, D>
+where
+    F: Float,
+    D: Differentiable<F>,
+{
+    pub fn new(max_depth: usize, max_iterations_count: usize, min_error: F, jacobian: D) -> Self {
         Self {
             max_depth,
             max_iterations_count,
@@ -50,14 +59,15 @@ impl DifferentialInverseKinematics {
     }
 }
 
-impl<RB, IT> Inverse<IT, RB> for DifferentialInverseKinematics
+impl<RB, IT, F, D> Inverse<IT, RB> for DifferentialInverseKinematics<F, D>
 where
     IT: DepthFirstIterable<RB, RB::NodeId>,
-    RB: Rigid,
+    RB: Rigid<FloatType = F>,
+    F: Float + Sum,
+    D: Differentiable<F>,
     // DM: 'b + Differentiable<Data<'b> = &'b [f64]>, // Cannot not use Self::Data here (!?)
 {
-    type Info = InverseKinematicsInfo;
-    type Data<'a> = &'a [f64];
+    type Info = InverseKinematicsInfo<F>;
 
     fn initialize(
         &mut self,
@@ -70,14 +80,14 @@ where
         self.model.setup(tree, &selected_joints, &selected_effectors);
     }
 
-    fn solve(&mut self, tree: &IT, params: &mut [<RB as Rigid>::FloatType], targets: &[f64]) -> Self::Info {
+    fn solve(&mut self, tree: &IT, params: &mut [F], targets: &[F]) -> Self::Info {
         self.model.compute(tree, params, ComputeSelection::All);
 
         let mut counter = 0;
-        let mut error;
+        let mut error: F;
         loop {
             let diff = izip!(self.model.configuration(), targets)
-                .map(|(x, y)| x - y)
+                .map(|(x, y)| *x - *y)
                 .collect_vec();
 
             RB::solve_linear(
@@ -88,7 +98,7 @@ where
                 params,
             );
 
-            error = diff.iter().map(|x| x * x).sum();
+            error = diff.iter().map(|x| *x * *x).sum();
 
             if error < self.min_error {
                 break;

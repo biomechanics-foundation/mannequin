@@ -1,5 +1,6 @@
 use crate::{forward::TransformationAccumulation, DepthFirstIterable, Nodelike, Rigid};
 use itertools::{izip, Itertools};
+use num_traits::Float;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
@@ -11,27 +12,28 @@ pub enum ComputeSelection {
 }
 
 /// A kinematic model that can compute a configuration and its partial derivties (Jacobian matrix)
-pub trait Differentiable {
-    type Data<'a>
-    where
-        Self: 'a; // https://github.com/rust-lang/rust/issues/87479
+pub trait Differentiable<F: Float> {
+    // Document this (blog). It's required for returning a reference to internal data
+    // type Data<'a>
+    // where
+    //     Self: 'a; // https://github.com/rust-lang/rust/issues/87479
 
     /// returns a reference to the internal data type
-    fn jacobian(&self) -> Self::Data<'_>;
-    fn configuration(&self) -> Self::Data<'_>;
+    fn jacobian(&self) -> &[F];
+    fn configuration(&self) -> &[F];
 
     /// compute the jacobian matrix
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<&I>, selected_effectors: &HashSet<&I>)
     where
         T: DepthFirstIterable<R, I>,
-        R: Rigid,
+        R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug;
 
     /// Compute is necessary as the structure holds the memory for the jacobian and the forward vector
     fn compute<T, R, I>(&mut self, tree: &T, params: &[R::FloatType], selection: ComputeSelection)
     where
         T: DepthFirstIterable<R, I>,
-        R: Rigid,
+        R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug;
 
     fn rows(&self) -> usize;
@@ -46,9 +48,9 @@ pub trait Differentiable {
 /// The composition of the Jacobian does not require a specific backend and can directly operate on
 /// a rust vector instead. All backends can operate on this structure without copying the data.
 #[derive(Debug, Default)]
-pub struct DifferentiableModel {
-    matrix: Vec<f64>,
-    configuration: Vec<f64>,
+pub struct DifferentiableModel<F: Float> {
+    matrix: Vec<F>,
+    configuration: Vec<F>,
     rows: usize,
     cols: usize,
     /// row index at which each effector node starts. Same length as nodes!
@@ -57,20 +59,18 @@ pub struct DifferentiableModel {
     selected_effectors: Vec<bool>,
 }
 
-impl DifferentiableModel {
+impl<F: Float + Default> DifferentiableModel<F> {
     pub fn new() -> Self {
         Self { ..Default::default() }
     }
 }
 
-impl Differentiable for DifferentiableModel {
-    type Data<'a> = &'a Vec<f64>;
-
-    fn jacobian(&self) -> Self::Data<'_> {
+impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
+    fn jacobian(&self) -> &[F] {
         &self.matrix
     }
 
-    fn configuration(&self) -> Self::Data<'_> {
+    fn configuration(&self) -> &[F] {
         &self.configuration
     }
 
@@ -78,7 +78,7 @@ impl Differentiable for DifferentiableModel {
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<&I>, selected_effectors: &HashSet<&I>)
     where
         T: DepthFirstIterable<R, I>,
-        R: Rigid,
+        R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug,
     {
         self.selected_joints = tree.iter().map(|n| selected_joints.get(&n.id()).is_some()).collect();
@@ -98,10 +98,10 @@ impl Differentiable for DifferentiableModel {
         self.cols = self.selected_joints.iter().filter(|&selected| *selected).count();
 
         self.matrix.clear();
-        self.matrix.resize(self.rows * self.cols, 0.0f64);
+        self.matrix.resize(self.rows * self.cols, F::zero());
 
         self.configuration.clear();
-        self.configuration.resize(self.cols, 0.0f64);
+        self.configuration.resize(self.cols, F::zero());
     }
 
     // fn data(&mut self) -> &mut [f64] {
@@ -119,7 +119,7 @@ impl Differentiable for DifferentiableModel {
     fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::FloatType], selection: ComputeSelection)
     where
         T: DepthFirstIterable<R, I>,
-        R: Rigid,
+        R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug,
     {
         // compute transformations only once
@@ -135,6 +135,7 @@ impl Differentiable for DifferentiableModel {
                 .filter_map(|(x, selected, offset)| if *selected { Some((x, offset)) } else { None })
                 .for_each(|((_, node, pose), offset)| {
                     node.get().configuration(pose, &mut self.configuration, *offset);
+                    // .configuration(pose, self.configuration.as_mut_slice(), *offset);
                 });
         }
 
