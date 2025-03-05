@@ -102,7 +102,7 @@ where
                 break;
             }
             counter += 1;
-            if counter > self.max_iterations_count {
+            if counter >= self.max_iterations_count {
                 break;
             }
         }
@@ -167,6 +167,7 @@ mod test {
 
         let result = ik.solve(&tree, &mut param, &effectors);
 
+        assert_eq!(result.iteration_count, 10);
         dbg!(param);
         dbg!(result);
         // assert_abs_diff_eq!(result, target, epsilon = 1e-6);

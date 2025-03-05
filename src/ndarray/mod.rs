@@ -100,5 +100,5 @@ pub fn cross_3d<T>(
 
 #[allow(unused_variables)]
 pub fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [f64]) {
-    todo!()
+    target_buffer.iter_mut().for_each(|el| *el = 0.0);
 }

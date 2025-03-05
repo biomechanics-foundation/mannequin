@@ -79,12 +79,13 @@ pub trait Rigid: PartialEq {
     /// Concat two transformations
     fn concat(first: &Self::Transformation, second: &Self::Transformation) -> Self::Transformation;
 
+    /// Solve system of linear equations, and *update* (additive) the parameters.
     fn solve_linear(
         matrix: &[Self::FloatType],
         rows: usize,
         cols: usize,
         vector: &[Self::FloatType],
-        target_buffer: &mut [Self::FloatType],
+        parameters: &mut [Self::FloatType],
     );
 }
 

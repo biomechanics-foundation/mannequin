@@ -154,7 +154,7 @@ impl Rigid for Segment {
 
     /// Get the coordinates of the effenctor in the global (or an arbitatry) system.
     fn effector(&self, pose: &Self::Transformation, buffer: &mut [f64], offset: usize) {
-        dbg!(&buffer, offset, self.effector_size());
+        // dbg!(&buffer, offset, self.effector_size());
         let target_buffer = &mut buffer[offset..offset + self.effector_size()];
         let mut target = ArrayViewMut1::from(target_buffer);
 
@@ -165,8 +165,8 @@ impl Rigid for Segment {
         }
     }
 
-    fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [f64]) {
-        solve_linear(matrix, rows, cols, vector, target_buffer);
+    fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], parameters: &mut [f64]) {
+        solve_linear(matrix, rows, cols, vector, parameters);
     }
 }
 
