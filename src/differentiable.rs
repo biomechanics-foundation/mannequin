@@ -79,8 +79,8 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
     fn effectors(&self) -> Vec<&[F]> {
         // &mut col[*offset..*offset + effector_node.get().effector_size()],
 
-        izip!(&self.offsets, &self.sizes)
-            .map(|(&i, &n)| &self.configuration[i..i + n])
+        izip!(&self.selected_effectors, &self.offsets, &self.sizes)
+            .filter_map(|(&s, &i, &n)| if s { Some(&self.configuration[i..i + n]) } else { None })
             .collect_vec()
     }
     fn flat_effectors(&self) -> &[F] {
@@ -207,4 +207,74 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+    // The `ndarray` as a reference implementation is used for testing
+
+    use super::*;
+    use crate::ndarray::robot::{Axis, LinkNodeId, Segment};
+    use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable};
+    use approx::assert_abs_diff_eq;
+    use ndarray::{prelude::*, Order};
+
+    #[test]
+    fn test_jacobian() {
+        let mut tree = DirectedArenaTree::<Segment, LinkNodeId>::new();
+
+        let mut trafo = Segment::neutral_element();
+        trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
+
+        let link1 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link2 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+        let link3 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link4 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+        // Doesn't do anything, is at the end
+        let link5 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+
+        // TODO .. can we make the refs fix in a way they don't get optimized away?
+        // Then these could be strings even!
+
+        let ref1 = tree.set_root(link1, "link1".to_string());
+        let _ref2 = tree.add(link2, "link2".to_string(), &ref1).unwrap();
+        let ref3 = tree.add(link3, "link3".to_string(), &ref1).unwrap();
+        let ref4 = tree.add(link4, "link4".to_string(), &ref3).unwrap();
+        tree.add(link5, "link5".to_string(), &ref4).unwrap();
+        let tree: DepthFirstArenaTree<_, _> = tree.into();
+
+        let mut jacobian = DifferentiableModel::<f64>::new();
+
+        jacobian.setup(
+            &tree,
+            &[
+                &"link1".to_string(),
+                &"link2".to_string(),
+                &"link3".to_string(),
+                &"link4".to_string(),
+            ]
+            .into(),
+            &[&"link2".to_string(), &"link4".to_string()].into(),
+        );
+
+        jacobian.compute(
+            &tree,
+            &[0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2, 0.0],
+            ComputeSelection::JacobianOnly,
+        );
+
+        let result = ArrayView1::<f64>::from(jacobian.jacobian())
+            .into_shape_with_order(((jacobian.rows(), jacobian.cols()), Order::ColumnMajor))
+            .unwrap();
+
+        let target = array![
+            [0.0, 0.0, 0.0, 0.0],
+            [20.0, 10.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0,],
+            [-10.0, 0.0, -10.0, 0.0],
+            [0.0, 0.0, -10.0, -10.0],
+            [0.0, 0.0, 0.0, 0.0,]
+        ];
+
+        assert_eq!(jacobian.dims(), (6, 4));
+        assert_abs_diff_eq!(result, target, epsilon = 1e-6);
+    }
+}

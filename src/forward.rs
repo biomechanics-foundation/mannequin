@@ -15,7 +15,7 @@ where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid,
 {
-    fn initialize(
+    fn setup(
         &mut self,
         tree: &IT,
         selected_joints: &[&<RB as Rigid>::NodeId],
@@ -62,7 +62,7 @@ where
         self.differential_model.effectors()
     }
 
-    fn initialize(
+    fn setup(
         &mut self,
         tree: &IT,
         selected_joints: &[&<RB as Rigid>::NodeId],
@@ -117,4 +117,45 @@ where
     }
 }
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+    // The `ndarray` as a reference implementation is used for testing
+
+    use super::*;
+    use crate::ndarray::robot::{Axis, Segment};
+    use crate::{DepthFirstArenaTree, DifferentiableModel, DirectedArenaTree, DirectionIterable};
+    use itertools::Itertools;
+    use ndarray::prelude::*;
+
+    #[test]
+    fn test_fk() {
+        let mut tree = DirectedArenaTree::new();
+        let mut fk = ForwardModel::new(10, DifferentiableModel::new());
+
+        let mut trafo = Segment::neutral_element();
+        trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
+
+        let link1 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link2 = Segment::new(&trafo, Axis::RotationZ, Some(Segment::neutral_element()));
+        let link3 = Segment::new(&trafo, Axis::RotationZ, Some(Segment::neutral_element()));
+        let link4 = Segment::new(&trafo, Axis::RotationZ, Some(Segment::neutral_element()));
+
+        // TODO .. can we make the refs fix in a way they don't get optimized away?
+        // Then these could be strings even!
+        let ref1 = tree.set_root(link1, "link1".to_string());
+        let ref2 = tree.add(link2, "link2".to_string(), &ref1).unwrap();
+        let ref3 = tree.add(link3, "link3".to_string(), &ref1).unwrap();
+        let ref4 = tree.add(link4, "link4".to_string(), &ref3).unwrap();
+
+        let tree: DepthFirstArenaTree<_, _> = tree.into();
+
+        fk.setup(&tree, &[&ref1, &ref2, &ref3, &ref4], &[&ref2, &ref3, &ref4]);
+        let res = fk.solve(&tree, &[0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
+        let res = res.iter().map(|&el| el.to_owned()).collect_vec();
+
+        assert_eq!(
+            res,
+            vec![vec![20.0, 0.0, 0.0], vec![20.0, 0.0, 0.0], vec![20.0, 10.0, 0.0]]
+        );
+    }
+}

@@ -13,7 +13,7 @@ where
 {
     type Info;
 
-    fn initialize(&mut self, tree: &IT, selected_joints: &[&<RB as Rigid>::NodeId], selected_effectors: &[&RB::NodeId]);
+    fn setup(&mut self, tree: &IT, selected_joints: &[&<RB as Rigid>::NodeId], selected_effectors: &[&RB::NodeId]);
 
     fn solve(
         &mut self,
@@ -23,6 +23,7 @@ where
     ) -> Self::Info;
 }
 
+#[derive(Debug, Clone)]
 pub struct InverseKinematicsInfo<F: Float> {
     pub iteration_count: usize,
     pub squared_error: F,
@@ -65,7 +66,7 @@ where
 {
     type Info = InverseKinematicsInfo<F>;
 
-    fn initialize(
+    fn setup(
         &mut self,
         tree: &IT,
         selected_joints: &[&<RB as Rigid>::NodeId],
@@ -110,5 +111,64 @@ where
             iteration_count: counter,
             squared_error: error,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    // The `ndarray` as a reference implementation is used for testing
+
+    use super::*;
+    use crate::ndarray::robot::{Axis, LinkNodeId, Segment};
+    use crate::{DepthFirstArenaTree, DifferentiableModel, DirectedArenaTree, DirectionIterable};
+    use approx::assert_abs_diff_eq;
+    use ndarray::{prelude::*, Order};
+
+    #[test]
+    fn test_ik() {
+        let mut tree = DirectedArenaTree::<Segment, LinkNodeId>::new();
+
+        let mut trafo = Segment::neutral_element();
+        trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
+
+        let link1 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link2 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+        let link3 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link4 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+        // Doesn't do anything, is at the end
+        let link5 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+
+        // TODO .. can we make the refs fix in a way they don't get optimized away?
+        // Then these could be strings even!
+
+        let ref1 = tree.set_root(link1, "link1".to_string());
+        let _ref2 = tree.add(link2, "link2".to_string(), &ref1).unwrap();
+        let ref3 = tree.add(link3, "link3".to_string(), &ref1).unwrap();
+        let ref4 = tree.add(link4, "link4".to_string(), &ref3).unwrap();
+        tree.add(link5, "link5".to_string(), &ref4).unwrap();
+        let tree: DepthFirstArenaTree<_, _> = tree.into();
+
+        let mut ik = DifferentialInverseModel::new(42, 10, 0.01, DifferentiableModel::new());
+
+        ik.setup(
+            &tree,
+            &[
+                &"link1".to_string(),
+                &"link2".to_string(),
+                &"link3".to_string(),
+                &"link4".to_string(),
+            ],
+            &[&"link2".to_string(), &"link4".to_string()],
+        );
+
+        let effectors = vec![vec![20.0, 0.0, 0.0], vec![20.0, 10.0, 0.0]];
+        let effectors = effectors.into_iter().flatten().collect_vec();
+        let mut param = vec![0.0; 5];
+
+        let result = ik.solve(&tree, &mut param, &effectors);
+
+        dbg!(param);
+        dbg!(result);
+        // assert_abs_diff_eq!(result, target, epsilon = 1e-6);
     }
 }

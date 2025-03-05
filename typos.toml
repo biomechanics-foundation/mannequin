@@ -1,3 +1,5 @@
 [default.extend-words]
 # Add words to ignore here
 # exxample = "exxample"
+
+# Need separate `toml` file, VSCode extension does not check `Cargo.toml`
