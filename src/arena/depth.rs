@@ -1,4 +1,4 @@
-//! Data structure representing an arena tree in which the arena is sorted in depth-frist
+//! Data structure representing an arena tree in which the arena is sorted in depth-first
 //! order for faster access
 
 use super::{
@@ -198,13 +198,13 @@ mod tests {
         assert_eq!(tree.nodes[2].children, &[ArenaIndex(6)]);
         assert_eq!(tree.nodes[3].children, &[ArenaIndex(5)]);
 
-        // // Example of how to print the hierachy
+        // // Example of how to print the hierarchy
         // tree.nodes
         // .iter()
         // .enumerate()
         // .for_each(|(i, n)| println!("{i}.: id: {}, load: {}, children {:?}", n.id, n.load, n.children));
 
-        // Optimize the tree such that the nodes are sorted in depth-frist manner
+        // Optimize the tree such that the nodes are sorted in depth-first manner
         let tree: DepthFirstArenaTree<usize, String> = tree.into();
 
         // Check correctness of child references for two nodes

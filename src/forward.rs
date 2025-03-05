@@ -1,12 +1,8 @@
 /*! Defines the payload carried by [Nodelike] in the context of kinematics/character animation */
 
-use std::collections::HashSet;
+use crate::{DepthFirstIterable, Nodelike, Rigid};
 
-use itertools::Itertools;
-
-use crate::{differentiable, mannequin::Rigid, DepthFirstIterable, Differentiable, Nodelike};
-
-/// Trait representing a stateful forward kinematics algoritm. For instance, it can represent a rigid body mannequin
+/// Trait representing a stateful forward kinematics algorithm. For instance, it can represent a rigid body mannequin
 /// (e.g., a robot) or softbody/skinning for character animation.
 pub trait Forward<IT, RB>
 where
@@ -45,7 +41,7 @@ where
 {
     fn solve(&mut self, tree: &IT, params: &[<RB as Rigid>::FloatType]) -> Vec<<RB as Rigid>::Transformation> {
         todo!()
-        // not the same retun type as DifferentiableModel
+        // not the same return type as DifferentiableModel
     }
 
     fn initialize(&mut self, tree: &IT, selected_effectors: &[<RB as Rigid>::NodeId]) {

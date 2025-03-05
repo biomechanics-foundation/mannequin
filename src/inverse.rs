@@ -23,13 +23,13 @@ where
     ) -> Self::Info;
 }
 
-struct InverseKinematicsInfo<F: Float> {
-    iteration_count: usize,
-    squared_error: F,
+pub struct InverseKinematicsInfo<F: Float> {
+    pub iteration_count: usize,
+    pub squared_error: F,
 }
 
 /// Reference implementation that is agnostic of the backend
-struct DifferentialInverseKinematics<F, D>
+pub struct DifferentialInverseKinematics<F, D>
 where
     F: Float,
     D: Differentiable<F>,

@@ -32,5 +32,5 @@ nalgebra = ["dep:nalgebra"]
 rayon = ["dep:rayon"]
 
 [dev-dependencies]
-test-log = { version = "0.2.16", features = ["trace"] }
 approx = "0.5"
+test-log = { version = "0.2.16", features = ["trace"] }

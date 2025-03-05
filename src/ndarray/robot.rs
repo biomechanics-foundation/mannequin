@@ -2,7 +2,7 @@
 #![allow(unused_variables)]
 
 use super::{
-    cross_3d, invert_tranformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4, solve_linear, translate_x_4x4,
+    cross_3d, invert_transformation_4x4, rotate_x_4x4, rotate_y_4x4, rotate_z_4x4, solve_linear, translate_x_4x4,
     translate_y_4x4, translate_z_4x4,
 };
 use crate::Rigid;
@@ -69,7 +69,7 @@ impl Rigid for Segment {
             Axis::RotationX => rotate_x_4x4(params[index]),
             Axis::RotationY => rotate_y_4x4(params[index]),
             Axis::RotationZ => rotate_z_4x4(params[index]),
-            // TODO implement arbitratry axis and translations
+            // TODO implement arbitrary axis and translations
             Axis::Rotation(_) => todo!(),
             Axis::TranslationX => translate_x_4x4(params[index]),
             Axis::TranslationY => translate_y_4x4(params[index]),
@@ -84,7 +84,7 @@ impl Rigid for Segment {
     }
 
     fn localize(&self, other: &Self::Point) -> Self::Point {
-        invert_tranformation_4x4(&self.link).dot(other)
+        invert_transformation_4x4(&self.link).dot(other)
     }
 
     fn neutral_element() -> Self::Transformation {
@@ -96,7 +96,7 @@ impl Rigid for Segment {
     }
 
     fn invert(trafo: &Self::Transformation) -> Self::Transformation {
-        invert_tranformation_4x4(trafo)
+        invert_transformation_4x4(trafo)
     }
 
     fn dim(&self) -> usize {
@@ -295,6 +295,6 @@ mod tests {
             [0.0, 0.0, 0.0, 0.0,]
         ];
 
-        assert_abs_diff_eq!(result, target , epsilon = 1e-6);
+        assert_abs_diff_eq!(result, target, epsilon = 1e-6);
     }
 }

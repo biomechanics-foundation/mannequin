@@ -43,9 +43,9 @@ pub trait Rigid: PartialEq {
     fn dim(&self) -> usize;
 
     /// Compute partial derivative of all effectors
-    /// pose: This node's FoR in global coordinates
+    /// pose: This node's frame of in global coordinates
     /// joint: Reference to the joint node
-    /// joint_pose: the joint's FoR in global coordinates
+    /// joint_pose: the joint's frame of in global coordinates
     /// target_buffer: Memory location to where the results are written to. The implementation is responsible of taking care only that
     /// correct location in the buffer is written to (e.g.,
     /// `[offset..offset + self.effector_size()]`)
@@ -64,8 +64,8 @@ pub trait Rigid: PartialEq {
     /// number of effectors
     fn effector_count(&self) -> usize;
 
-    /// The number of rows / elements the effector take in the jacobian matrix (usually dim * cound).
-    /// However, by manually granting contol, one can have effocters with different dimensionality
+    /// The number of rows / elements the effector take in the jacobian matrix (usually dim * count).
+    /// However, by manually granting control, one can have effocters with different dimensionality
     fn effector_size(&self) -> usize {
         self.dim() * self.effector_count()
     }
@@ -111,10 +111,10 @@ where
     FK: Forward<IT, RB>,
     IK: Inverse<IT, RB>,
 {
-    pub fn new(tree: IT, foward_kinematics: FK, inverse_kinematics: IK) -> Self {
+    pub fn new(tree: IT, forward_kinematics: FK, inverse_kinematics: IK) -> Self {
         Mannequin {
             tree,
-            fk: foward_kinematics,
+            fk: forward_kinematics,
             ik: inverse_kinematics,
             rigid_body: PhantomData,
         }

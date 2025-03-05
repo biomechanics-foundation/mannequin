@@ -109,7 +109,7 @@ pub struct DirectedArenaTree<Load, NodeID> {
 }
 
 impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
-    /// Contructor. Sorting indicates whether the elements are stored to
+    /// Constructor. Sorting indicates whether the elements are stored to
     /// make either deoth or breadth first traversal efficient (slow insertion). `None` indicates
     /// that the data will be unordered (fast insertion, slower traversal).
     pub fn with_capacity(capacity: usize) -> Self {
@@ -124,7 +124,7 @@ impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
         }
     }
 
-    /// Contructor. Sorting indicates whether the elements are stored to
+    /// Constructor. Sorting indicates whether the elements are stored to
     /// make either deoth or breadth first traversal efficient (slow insertion). `None` indicates
     /// that the data will be unordered (fast insertion, slower traversal).
     pub fn new() -> Self {
@@ -179,7 +179,7 @@ where
     fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>> {
         let id = node.id();
         // can we rely on this check?
-        self.node_by_id(&id).ok_or(MannequinError::UnkonwnNode(id))?;
+        self.node_by_id(&id).ok_or(MannequinError::UnknownNode(id))?;
 
         // FIXME: map node.children to the nodes (don't loop over everything)
         Ok(self
@@ -232,7 +232,7 @@ where
     fn add(&mut self, load: Load, node_id: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>> {
         let parent = self
             .node_by_id(parent)
-            .ok_or(MannequinError::UnkonwnNode(parent.clone()))?;
+            .ok_or(MannequinError::UnknownNode(parent.clone()))?;
         // println!("Adding {:?} to parent {:?}", load, parent);
 
         let index = self.nodes.len();

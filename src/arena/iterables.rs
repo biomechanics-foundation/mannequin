@@ -14,7 +14,7 @@ pub trait Nodelike<Load, NodeId> {
     /// Get the node's distance to its root node. Required for computing accumulations.
     fn depth(&self) -> usize;
 
-    // Note: a get chidren would be useful but it is quite a challenge
+    // Note: a get children would be useful but it is quite a challenge
     // (enforcing equality of associated types). Simpler to implement on [BaseDirectionIterable]
 }
 
@@ -37,6 +37,9 @@ where
     fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node>;
 
     fn len(&self) -> usize {
+        unimplemented!()
+    }
+    fn is_empty(&self) -> bool {
         unimplemented!()
     }
 }

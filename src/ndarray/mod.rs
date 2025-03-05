@@ -1,11 +1,6 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
-use crate::differentiable::ComputeSelection;
-use crate::{DepthFirstIterable, Differentiable, DifferentiableModel, MannequinError, Rigid};
-use ndarray::Order;
+use crate::MannequinError;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::hash::Hash;
 
 pub mod robot;
 
@@ -78,8 +73,8 @@ pub fn translation<T>(param: &[f64]) -> Result<Array2<f64>, MannequinError<T>> {
     Ok(result)
 }
 
-/// inverts a homogeneous, 4x4 tranformation matrix.
-pub fn invert_tranformation_4x4(trafo: &Array2<f64>) -> Array2<f64> {
+/// inverts a homogeneous, 4x4 transformation matrix.
+pub fn invert_transformation_4x4(trafo: &Array2<f64>) -> Array2<f64> {
     let mut result = Array2::<f64>::eye(4);
     let rot = trafo.slice(s![..3, ..3]);
     result.slice_mut(s![..3, ..3]).assign(&rot.t());
