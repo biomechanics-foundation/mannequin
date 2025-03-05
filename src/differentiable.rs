@@ -6,7 +6,7 @@ use rayon::prelude::*;
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
 pub enum ComputeSelection {
-    ConfigurationOnly,
+    EffectorsOnly,
     JacobianOnly,
     All,
 }
@@ -20,8 +20,8 @@ pub trait Differentiable<F: Float> {
 
     /// returns a reference to the internal data type
     fn jacobian(&self) -> &[F];
-    fn flat_configuration(&self) -> &[F];
-    fn configuration(&self) -> Vec<&[F]>;
+    fn flat_effectors(&self) -> &[F];
+    fn effectors(&self) -> Vec<&[F]>;
 
     /// compute the jacobian matrix
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<&I>, selected_effectors: &HashSet<&I>)
@@ -76,14 +76,14 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         &self.matrix
     }
 
-    fn configuration(&self) -> Vec<&[F]> {
+    fn effectors(&self) -> Vec<&[F]> {
         // &mut col[*offset..*offset + effector_node.get().effector_size()],
 
         izip!(&self.offsets, &self.sizes)
             .map(|(&i, &n)| &self.configuration[i..i + n])
             .collect_vec()
     }
-    fn flat_configuration(&self) -> &[F] {
+    fn flat_effectors(&self) -> &[F] {
         &self.configuration
     }
 
@@ -129,7 +129,7 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         self.matrix.resize(self.rows * self.cols, F::zero());
 
         self.configuration.clear();
-        self.configuration.resize(self.cols, F::zero());
+        self.configuration.resize(self.rows, F::zero());
     }
 
     fn rows(&self) -> usize {
@@ -160,12 +160,11 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
             .map(|(idx, (node, trafo))| (idx, node, trafo)) // flatten
             .collect_vec();
 
-        if matches!(selection, ComputeSelection::ConfigurationOnly | ComputeSelection::All) {
-            izip!(&nodes_trafos, &self.selected_joints, &self.offsets)
+        if matches!(selection, ComputeSelection::EffectorsOnly | ComputeSelection::All) {
+            izip!(&nodes_trafos, &self.selected_effectors, &self.offsets)
                 .filter_map(|(x, selected, offset)| if *selected { Some((x, offset)) } else { None })
                 .for_each(|((_, node, pose), offset)| {
-                    node.get().configuration(pose, &mut self.configuration, *offset);
-                    // .configuration(pose, self.configuration.as_mut_slice(), *offset);
+                    node.get().effector(pose, &mut self.configuration, *offset);
                 });
         }
 

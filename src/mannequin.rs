@@ -59,7 +59,7 @@ pub trait Rigid: PartialEq {
         offset: usize,
     );
 
-    fn configuration(&self, pose: &Self::Transformation, target_buffer: &mut [Self::FloatType], offset: usize);
+    fn effector(&self, pose: &Self::Transformation, target_buffer: &mut [Self::FloatType], offset: usize);
 
     /// number of effectors
     fn effector_count(&self) -> usize;

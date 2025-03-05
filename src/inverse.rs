@@ -13,7 +13,7 @@ where
 {
     type Info;
 
-    fn initialize(&mut self, tree: &IT, selected_joints: &[<RB as Rigid>::NodeId], selected_effectors: &[RB::NodeId]);
+    fn initialize(&mut self, tree: &IT, selected_joints: &[&<RB as Rigid>::NodeId], selected_effectors: &[&RB::NodeId]);
 
     fn solve(
         &mut self,
@@ -29,7 +29,7 @@ pub struct InverseKinematicsInfo<F: Float> {
 }
 
 /// Reference implementation that is agnostic of the backend
-pub struct DifferentialInverseKinematics<F, D>
+pub struct DifferentialInverseModel<F, D>
 where
     F: Float,
     D: Differentiable<F>,
@@ -37,25 +37,25 @@ where
     _max_depth: usize,
     max_iterations_count: usize,
     min_error: F,
-    model: D,
+    differential_model: D,
 }
 
-impl<F, D> DifferentialInverseKinematics<F, D>
+impl<F, D> DifferentialInverseModel<F, D>
 where
     F: Float,
     D: Differentiable<F>,
 {
-    pub fn new(_max_depth: usize, max_iterations_count: usize, min_error: F, jacobian: D) -> Self {
+    pub fn new(_max_depth: usize, max_iterations_count: usize, min_error: F, differential_model: D) -> Self {
         Self {
             _max_depth,
             max_iterations_count,
             min_error,
-            model: jacobian,
+            differential_model,
         }
     }
 }
 
-impl<RB, IT, F, D> Inverse<IT, RB> for DifferentialInverseKinematics<F, D>
+impl<RB, IT, F, D> Inverse<IT, RB> for DifferentialInverseModel<F, D>
 where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid<FloatType = F>,
@@ -68,28 +68,29 @@ where
     fn initialize(
         &mut self,
         tree: &IT,
-        selected_joints: &[<RB as Rigid>::NodeId],
-        selected_effectors: &[<RB as Rigid>::NodeId],
+        selected_joints: &[&<RB as Rigid>::NodeId],
+        selected_effectors: &[&<RB as Rigid>::NodeId],
     ) {
-        let selected_effectors = HashSet::from_iter(selected_effectors);
-        let selected_joints = HashSet::from_iter(selected_joints);
-        self.model.setup(tree, &selected_joints, &selected_effectors);
+        let selected_effectors = HashSet::from_iter(selected_effectors.iter().cloned());
+        let selected_joints = HashSet::from_iter(selected_joints.iter().cloned());
+        self.differential_model
+            .setup(tree, &selected_joints, &selected_effectors);
     }
 
     fn solve(&mut self, tree: &IT, params: &mut [F], targets: &[F]) -> Self::Info {
-        self.model.compute(tree, params, ComputeSelection::All);
+        self.differential_model.compute(tree, params, ComputeSelection::All);
 
         let mut counter = 0;
         let mut error: F;
         loop {
-            let diff = izip!(self.model.flat_configuration(), targets)
+            let diff = izip!(self.differential_model.flat_effectors(), targets)
                 .map(|(x, y)| *x - *y)
                 .collect_vec();
 
             RB::solve_linear(
-                self.model.jacobian(),
-                self.model.rows(),
-                self.model.cols(),
+                self.differential_model.jacobian(),
+                self.differential_model.rows(),
+                self.differential_model.cols(),
                 &diff,
                 params,
             );

@@ -2,7 +2,11 @@
 // FIXME
 #![allow(unused_variables, dead_code)]
 
-use crate::{DepthFirstIterable, Nodelike, Rigid};
+use std::{collections::HashSet, marker::PhantomData};
+
+use num_traits::Float;
+
+use crate::{differentiable::ComputeSelection, DepthFirstIterable, Differentiable, Nodelike, Rigid};
 
 /// Trait representing a stateful forward kinematics algorithm. For instance, it can represent a rigid body mannequin
 /// (e.g., a robot) or softbody/skinning for character animation.
@@ -11,43 +15,63 @@ where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid,
 {
-    fn initialize(&mut self, tree: &IT, target_refs: &[RB::NodeId]);
-    fn solve(&mut self, tree: &IT, params: &[RB::FloatType]) -> Vec<RB::Transformation>;
+    fn initialize(
+        &mut self,
+        tree: &IT,
+        selected_joints: &[&<RB as Rigid>::NodeId],
+        selected_effectors: &[&<RB as Rigid>::NodeId],
+    );
+    fn solve(&mut self, tree: &IT, params: &[RB::FloatType]) -> Vec<&[RB::FloatType]>;
 }
 
 /// Default forward kinematics that wraps a [Differentiable] kinematics model.
-pub struct ForwardsKinematics<RB>
+pub struct ForwardModel<F, D>
 where
-    RB: Rigid,
+    F: Float,
+    D: Differentiable<F>,
 {
-    max_depth: usize,
-    target_refs: Vec<<RB as Rigid>::NodeId>,
+    _max_depth: usize,
+    differential_model: D,
+    p: PhantomData<F>,
 }
 
-impl<RB> ForwardsKinematics<RB>
+impl<F, D> ForwardModel<F, D>
 where
-    RB: Rigid,
+    F: Float,
+    D: Differentiable<F>,
 {
-    pub fn new(max_depth: usize) -> Self {
+    pub fn new(_max_depth: usize, model: D) -> Self {
         Self {
-            max_depth,
-            target_refs: vec![],
+            _max_depth,
+            differential_model: model,
+            p: PhantomData,
         }
     }
 }
 
-impl<IT, RB> Forward<IT, RB> for ForwardsKinematics<RB>
+impl<IT, RB, F, D> Forward<IT, RB> for ForwardModel<F, D>
 where
     IT: DepthFirstIterable<RB, RB::NodeId>,
-    RB: Rigid,
+    RB: Rigid<FloatType = F>,
+    F: Float,
+    D: Differentiable<F>,
 {
-    fn solve(&mut self, tree: &IT, params: &[<RB as Rigid>::FloatType]) -> Vec<<RB as Rigid>::Transformation> {
-        todo!()
-        // not the same return type as DifferentiableModel
+    fn solve(&mut self, tree: &IT, params: &[<RB as Rigid>::FloatType]) -> Vec<&[F]> {
+        self.differential_model
+            .compute(tree, params, ComputeSelection::EffectorsOnly);
+        self.differential_model.effectors()
     }
 
-    fn initialize(&mut self, tree: &IT, selected_effectors: &[<RB as Rigid>::NodeId]) {
-        todo!()
+    fn initialize(
+        &mut self,
+        tree: &IT,
+        selected_joints: &[&<RB as Rigid>::NodeId],
+        selected_effectors: &[&<RB as Rigid>::NodeId],
+    ) {
+        let selected_effectors = HashSet::from_iter(selected_effectors.iter().cloned());
+        let selected_joints = HashSet::from_iter(selected_joints.iter().cloned());
+        self.differential_model
+            .setup(tree, &selected_joints, &selected_effectors);
     }
 }
 

@@ -35,7 +35,7 @@ pub struct Segment {
     link: Array2<f64>,
     axis: Axis,
     mode: Mode,
-    effector: Option<Array2<f64>>,
+    effector_local: Option<Array2<f64>>,
 }
 
 impl Segment {
@@ -44,7 +44,7 @@ impl Segment {
             link: from_parent.clone(),
             axis,
             mode: Mode::Position,
-            effector,
+            effector_local: effector,
         }
     }
 }
@@ -107,7 +107,7 @@ impl Rigid for Segment {
     }
 
     fn effector_count(&self) -> usize {
-        if self.effector.is_some() {
+        if self.effector_local.is_some() {
             1
         } else {
             0
@@ -124,7 +124,6 @@ impl Rigid for Segment {
     ) {
         // Formula: axis_in_world x (end_effector_world - pivod_in_world)
 
-        // TODO: even this code might be generalized
         let local_axis = match &joint.axis {
             Axis::RotationX => &array![1.0, 0.0, 0.0, 0.0],
             Axis::RotationY => &array![0.0, 1.0, 0.0, 0.0],
@@ -139,7 +138,7 @@ impl Rigid for Segment {
 
         // TODO can we avoid this clone?
         let mut pose = pose.clone();
-        if let Some(effector) = &self.effector {
+        if let Some(effector) = &self.effector_local {
             pose = pose.dot(effector);
         }
         let lever = &pose.slice(s![0..3, 3]) - &joint_pose.slice(s![0..3, 3]);
@@ -153,8 +152,17 @@ impl Rigid for Segment {
         .unwrap();
     }
 
-    fn configuration(&self, pose: &Self::Transformation, target_buffer: &mut [f64], offset: usize) {
-        todo!()
+    /// Get the coordinates of the effenctor in the global (or an arbitatry) system.
+    fn effector(&self, pose: &Self::Transformation, buffer: &mut [f64], offset: usize) {
+        dbg!(&buffer, offset, self.effector_size());
+        let target_buffer = &mut buffer[offset..offset + self.effector_size()];
+        let mut target = ArrayViewMut1::from(target_buffer);
+
+        if let Some(effector) = &self.effector_local {
+            target.assign(&(pose.dot(effector)).slice(s![0..3, 3]));
+        } else {
+            panic!("Should not call this method if no effector is defined")
+        }
     }
 
     fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [f64]) {
@@ -201,23 +209,23 @@ mod tests {
     use super::{Axis, DifferentialIK, LinkNodeId, Segment};
     use crate::differentiable::ComputeSelection;
     use crate::{DepthFirstArenaTree, DifferentiableModel, DirectedArenaTree, DirectionIterable, Forward, Rigid};
-    use crate::{Differentiable, ForwardsKinematics};
+    use crate::{Differentiable, ForwardModel};
     use approx::assert_abs_diff_eq;
     use itertools::Itertools;
     use ndarray::{prelude::*, Order};
 
     #[test]
     fn test_fk() {
-        let mut fk = ForwardsKinematics::<Segment>::new(10);
-        let mut tree = DirectedArenaTree::<Segment, LinkNodeId>::new();
+        let mut tree = DirectedArenaTree::new();
+        let mut fk = ForwardModel::new(10, DifferentiableModel::new());
 
         let mut trafo = Segment::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
 
         let link1 = Segment::new(&trafo, Axis::RotationZ, None);
-        let link2 = Segment::new(&trafo, Axis::RotationZ, None);
-        let link3 = Segment::new(&trafo, Axis::RotationZ, None);
-        let link4 = Segment::new(&trafo, Axis::RotationZ, None);
+        let link2 = Segment::new(&trafo, Axis::RotationZ, Some(Segment::neutral_element()));
+        let link3 = Segment::new(&trafo, Axis::RotationZ, Some(Segment::neutral_element()));
+        let link4 = Segment::new(&trafo, Axis::RotationZ, Some(Segment::neutral_element()));
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
@@ -228,9 +236,9 @@ mod tests {
 
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
-        fk.initialize(&tree, &[ref2, ref3, ref4]);
+        fk.initialize(&tree, &[&ref1, &ref2, &ref3, &ref4], &[&ref2, &ref3, &ref4]);
         let res = fk.solve(&tree, &[0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
-        let res = res.iter().map(|el| el.slice(s![..3, 3]).to_vec()).collect_vec();
+        let res = res.iter().map(|&el| el.to_owned()).collect_vec();
 
         assert_eq!(
             res,
