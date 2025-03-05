@@ -36,12 +36,8 @@ where
     /// Get [NodeLike] from an identifier.
     fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node>;
 
-    fn len(&self) -> usize {
-        unimplemented!()
-    }
-    fn is_empty(&self) -> bool {
-        unimplemented!()
-    }
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
 }
 
 /// Trait for a mutable tree that can be iterated (traverserd) in both directions: depth-first and

@@ -121,15 +121,18 @@ where
     }
 
     /// Forward kinematics for the targets in `target_refs` and the joint positions in `param`.
+    #[allow(unused_variables)]
     pub fn forward(
         &mut self,
-        param: &[RB::FloatType], /*, target_refs: &[RB::NodeId]*/
+        _param: &[RB::FloatType], /*, target_refs: &[RB::NodeId]*/
     ) -> Vec<RB::Transformation> {
-        self.fk.solve(&self.tree, param)
+        // self.fk.solve(&self.tree, param)
+        todo!()
     }
 
     /// Inverse kinematics for the targets in `target_refs` and the desired working space coordinates in `target_val`.
-    pub fn inverse(&mut self, param: &mut [RB::FloatType], target_val: &[RB::Point]) -> IK::Info {
+    #[allow(unused_variables)]
+    pub fn inverse(&mut self, _param: &mut [RB::FloatType], _target_val: &[RB::Point]) -> IK::Info {
         // self.ik.solve(&self.tree, param, target_val)
         todo!()
     }

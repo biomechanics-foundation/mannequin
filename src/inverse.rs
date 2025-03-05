@@ -34,13 +34,10 @@ where
     F: Float,
     D: Differentiable<F>,
 {
-    max_depth: usize,
+    _max_depth: usize,
     max_iterations_count: usize,
     min_error: F,
-    selected_effectors: Vec<bool>,
-    // TODO: I want this to be generic but this fails when binding the GATs
     model: D,
-    // model: DM,
 }
 
 impl<F, D> DifferentialInverseKinematics<F, D>
@@ -48,12 +45,11 @@ where
     F: Float,
     D: Differentiable<F>,
 {
-    pub fn new(max_depth: usize, max_iterations_count: usize, min_error: F, jacobian: D) -> Self {
+    pub fn new(_max_depth: usize, max_iterations_count: usize, min_error: F, jacobian: D) -> Self {
         Self {
-            max_depth,
+            _max_depth,
             max_iterations_count,
             min_error,
-            selected_effectors: vec![],
             model: jacobian,
         }
     }
@@ -86,7 +82,7 @@ where
         let mut counter = 0;
         let mut error: F;
         loop {
-            let diff = izip!(self.model.configuration(), targets)
+            let diff = izip!(self.model.flat_configuration(), targets)
                 .map(|(x, y)| *x - *y)
                 .collect_vec();
 

@@ -53,6 +53,14 @@ where
     fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node> {
         self.0.node_by_id(node_id)
     }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl<Load, NodeId> OptimizedDirectionIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>

@@ -197,6 +197,14 @@ where
         let index = self.lookup.get(node_ref)?;
         self.nodes.get(index.0)
     }
+
+    fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
 }
 
 impl<Load, NodeId> DirectionIterable<Load, NodeId> for DirectedArenaTree<Load, NodeId>

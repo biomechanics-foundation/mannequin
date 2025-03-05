@@ -1,4 +1,6 @@
 /*! Defines the payload carried by [Nodelike] in the context of kinematics/character animation */
+// FIXME
+#![allow(unused_variables, dead_code)]
 
 use crate::{DepthFirstIterable, Nodelike, Rigid};
 

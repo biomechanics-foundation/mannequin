@@ -250,6 +250,8 @@ mod tests {
         let link2 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
         let link3 = Segment::new(&trafo, Axis::RotationZ, None);
         let link4 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
+        // Doesn't do anything, is at the end
+        let link5 = Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone()));
 
         // TODO .. can we make the refs fix in a way they don't get optimized away?
         // Then these could be strings even!
@@ -258,7 +260,7 @@ mod tests {
         let ref2 = tree.add(link2, "link2".to_string(), &ref1).unwrap();
         let ref3 = tree.add(link3, "link3".to_string(), &ref1).unwrap();
         let ref4 = tree.add(link4, "link4".to_string(), &ref3).unwrap();
-
+        tree.add(link5, "link5".to_string(), &ref4).unwrap();
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
         let mut jacobian = DifferentiableModel::<f64>::new();
@@ -278,7 +280,7 @@ mod tests {
 
         jacobian.compute(
             &tree,
-            &[0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2],
+            &[0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2, 0.0],
             ComputeSelection::JacobianOnly,
         );
 
@@ -295,6 +297,7 @@ mod tests {
             [0.0, 0.0, 0.0, 0.0,]
         ];
 
+        assert_eq!(jacobian.dims(), (6, 4));
         assert_abs_diff_eq!(result, target, epsilon = 1e-6);
     }
 }

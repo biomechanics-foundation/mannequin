@@ -20,7 +20,8 @@ pub trait Differentiable<F: Float> {
 
     /// returns a reference to the internal data type
     fn jacobian(&self) -> &[F];
-    fn configuration(&self) -> &[F];
+    fn flat_configuration(&self) -> &[F];
+    fn configuration(&self) -> Vec<&[F]>;
 
     /// compute the jacobian matrix
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<&I>, selected_effectors: &HashSet<&I>)
@@ -38,6 +39,7 @@ pub trait Differentiable<F: Float> {
 
     fn rows(&self) -> usize;
     fn cols(&self) -> usize;
+    fn dims(&self) -> (usize, usize);
 }
 // Note: Won't make the trait itself generic. That would be cleaner but mean more overhead (i.e., requiring full qualifiers in compositions)
 
@@ -55,7 +57,11 @@ pub struct DifferentiableModel<F: Float> {
     cols: usize,
     /// row index at which each effector node starts. Same length as nodes!
     offsets: Vec<usize>,
+    /// Widths
+    sizes: Vec<usize>,
+    /// For each node a bool which decides whether its joint will be used. Same length as nodes!
     selected_joints: Vec<bool>,
+    /// For each node a bool which decides whether its effector will be used. Same length as nodes!
     selected_effectors: Vec<bool>,
 }
 
@@ -70,7 +76,14 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         &self.matrix
     }
 
-    fn configuration(&self) -> &[F] {
+    fn configuration(&self) -> Vec<&[F]> {
+        // &mut col[*offset..*offset + effector_node.get().effector_size()],
+
+        izip!(&self.offsets, &self.sizes)
+            .map(|(&i, &n)| &self.configuration[i..i + n])
+            .collect_vec()
+    }
+    fn flat_configuration(&self) -> &[F] {
         &self.configuration
     }
 
@@ -94,8 +107,23 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
             })
             .collect();
 
-        self.rows = self.offsets.iter().sum();
+        self.sizes = tree.iter().map(|n| n.get().effector_size()).collect();
+        dbg!(&self.offsets);
+        dbg!(&self.selected_effectors);
+
+        self.rows = tree
+            .iter()
+            .map(|node| {
+                if selected_effectors.get(&node.id()).is_some() {
+                    node.get().effector_size()
+                } else {
+                    0
+                }
+            })
+            .sum();
+
         self.cols = self.selected_joints.iter().filter(|&selected| *selected).count();
+        dbg!((self.rows, self.cols));
 
         self.matrix.clear();
         self.matrix.resize(self.rows * self.cols, F::zero());
@@ -103,10 +131,6 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         self.configuration.clear();
         self.configuration.resize(self.cols, F::zero());
     }
-
-    // fn data(&mut self) -> &mut [f64] {
-    //     &mut self.data
-    // }
 
     fn rows(&self) -> usize {
         self.rows
@@ -116,12 +140,18 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         self.cols
     }
 
+    fn dims(&self) -> (usize, usize) {
+        (self.rows, self.cols)
+    }
+
     fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::FloatType], selection: ComputeSelection)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug,
     {
+        debug_assert_eq!(params.len(), tree.len());
+
         // compute transformations only once
         let nodes_trafos = tree
             .iter()
@@ -176,3 +206,6 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {}
