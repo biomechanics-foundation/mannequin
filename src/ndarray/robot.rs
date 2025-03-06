@@ -7,7 +7,7 @@ use super::{
 };
 use crate::Rigid;
 use core::fmt;
-use ndarray::prelude::*;
+use ndarray::{prelude::*, Order};
 use ndarray::{Array1, Array2};
 
 #[derive(Debug, PartialEq, Default)]
@@ -166,7 +166,12 @@ impl Rigid for Segment {
     }
 
     fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], parameters: &mut [f64]) {
-        solve_linear(matrix, rows, cols, vector, parameters);
+        let matrix = ArrayView1::from(matrix)
+            .into_shape_with_order(((rows, cols), Order::ColumnMajor))
+            .expect("Cannot convert buffer to matrix"); // TODO error
+        let vector = ArrayView1::from(vector);
+        let parameters = ArrayViewMut1::from(parameters);
+        solve_linear(matrix, vector, parameters);
     }
 }
 

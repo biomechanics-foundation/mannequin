@@ -1,6 +1,7 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
 use crate::MannequinError;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
+use ndarray_linalg::Solve;
 
 pub mod robot;
 
@@ -99,6 +100,11 @@ pub fn cross_3d<T>(
 }
 
 #[allow(unused_variables)]
-pub fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], target_buffer: &mut [f64]) {
-    target_buffer.iter_mut().for_each(|el| *el = 0.0);
+pub fn solve_linear(matrix: ArrayView2<f64>, vector: ArrayView1<f64>, mut target: ArrayViewMut1<f64>) {
+    target.assign(&matrix.solve(&vector).expect("Cannot solve equations"));
 }
+
+// TODO Move functions into `spatial.rs` module
+// Make a struct implementing Rigid that has a generic member `nested` with a trait NestedRigid
+// that delegates everything to `nested` but with ndarray types
+// then move the robot implementation to example (unless used in benchmarks, then leave it in (as a feature maybe)).

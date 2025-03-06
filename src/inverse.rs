@@ -1,4 +1,4 @@
-use std::{collections::HashSet, iter::Sum};
+use std::{collections::HashSet, fmt::Debug, iter::Sum};
 
 use itertools::{izip, Itertools};
 use num_traits::Float;
@@ -60,7 +60,7 @@ impl<RB, IT, F, D> Inverse<IT, RB> for DifferentialInverseModel<F, D>
 where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid<FloatType = F>,
-    F: Float + Sum,
+    F: Float + Sum + Debug,
     D: Differentiable<F>,
     // DM: 'b + Differentiable<Data<'b> = &'b [f64]>, // Cannot not use Self::Data here (!?)
 {
@@ -97,6 +97,7 @@ where
             );
 
             error = diff.iter().map(|x| *x * *x).sum();
+            dbg!(&error);
 
             if error < self.min_error {
                 break;
