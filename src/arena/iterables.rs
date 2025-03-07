@@ -6,11 +6,11 @@ use std::{fmt::Debug, hash::Hash};
 /// Container that holds data in a [BaseDirectionIterable]
 /// Note: You probably do not need to implement this trait.
 /// Implementations of trees have [NodeLike]s that own your data.
-pub trait Nodelike<Load, NodeId> {
+pub trait NodeLike<Load, NodeId> {
     fn is_leaf(&self) -> bool;
     fn get(&self) -> &Load;
 
-    fn id(&self) -> NodeId;
+    fn id(&self) -> &NodeId;
     /// Get the node's distance to its root node. Required for computing accumulations.
     fn depth(&self) -> usize;
 
@@ -25,11 +25,11 @@ where
     Load: PartialEq,
     NodeId: Eq + Clone + Hash + Debug,
 {
-    type Node: 'static + Nodelike<Load, NodeId> + Debug; // cannot hold references
+    type Node: 'static + NodeLike<Load, NodeId> + Debug; // cannot hold references
 
     /// Get the (single) root node of the tree.
     fn root(&self) -> Result<&Self::Node, MannequinError<NodeId>>;
-    /// Access the children of a node. Not implemented on [Nodelike] for simplicity
+    /// Access the children of a node. Not implemented on [NodeLike] for simplicity
     fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>>;
     /// Lookup a node by its load.
     fn node_by_load(&self, load: &Load) -> Option<&Self::Node>;
@@ -75,7 +75,7 @@ where
 {
     fn iter(&self) -> impl Iterator<Item = &Self::Node>;
     fn iter_mut(&mut self) -> impl Iterator<Item = &mut Self::Node>;
-    // TODO: As these trees are mutuable (i.e., no nodes can be added), we can use the arena
+    // FIXME: As these trees are mutuable (i.e., no nodes can be added), we can use the arena
     // index for much faster lookups. Hashmaps are slow!
 }
 

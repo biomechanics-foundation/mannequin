@@ -30,7 +30,7 @@ pub mod inverse;
 pub mod mannequin;
 
 pub use arena::{
-    BreadthFirstIterable, DepthFirstArenaTree, DepthFirstIterable, DirectedArenaTree, DirectionIterable, Nodelike,
+    BreadthFirstIterable, DepthFirstArenaTree, DepthFirstIterable, DirectedArenaTree, DirectionIterable, NodeLike,
 };
 pub use differentiable::{Differentiable, DifferentiableModel};
 pub use errors::MannequinError;

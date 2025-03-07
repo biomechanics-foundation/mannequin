@@ -1,4 +1,4 @@
-/*! Defines the payload carried by [Nodelike] in the context of kinematics/character animation */
+/*! Defines the payload carried by [NodeLike] in the context of kinematics/character animation */
 // FIXME
 #![allow(unused_variables, dead_code)]
 
@@ -6,25 +6,20 @@ use std::{collections::HashSet, marker::PhantomData};
 
 use num_traits::Float;
 
-use crate::{differentiable::ComputeSelection, DepthFirstIterable, Differentiable, Nodelike, Rigid};
+use crate::{differentiable::ComputeSelection, DepthFirstIterable, Differentiable, NodeLike, Rigid};
 
-/// Trait representing a stateful forward kinematics algorithm. For instance, it can represent a rigid body mannequin
-/// (e.g., a robot) or softbody/skinning for character animation.
+/// Trait representing a stateful forward kinematics algorithm. It allows selecting the effectors and thus a specific,
+/// (or multiple) kinematic chain(s).
 pub trait Forward<IT, RB>
 where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid,
 {
-    fn setup(
-        &mut self,
-        tree: &IT,
-        selected_joints: &[&<RB as Rigid>::NodeId],
-        selected_effectors: &[&<RB as Rigid>::NodeId],
-    );
+    fn setup(&mut self, tree: &IT, selected_effectors: &[&<RB as Rigid>::NodeId]);
     fn solve(&mut self, tree: &IT, params: &[RB::FloatType]) -> Vec<&[RB::FloatType]>;
 }
 
-/// Default forward kinematics that wraps a [Differentiable] kinematics model.
+/// Default forward kinematics that is a thin wrapper around a [Differentiable] kinematics model.
 pub struct ForwardModel<F, D>
 where
     F: Float,
@@ -62,16 +57,8 @@ where
         self.differential_model.effectors()
     }
 
-    fn setup(
-        &mut self,
-        tree: &IT,
-        selected_joints: &[&<RB as Rigid>::NodeId],
-        selected_effectors: &[&<RB as Rigid>::NodeId],
-    ) {
-        let selected_effectors = HashSet::from_iter(selected_effectors.iter().cloned());
-        let selected_joints = HashSet::from_iter(selected_joints.iter().cloned());
-        self.differential_model
-            .setup(tree, &selected_joints, &selected_effectors);
+    fn setup(&mut self, tree: &IT, selected_effectors: &[&<RB as Rigid>::NodeId]) {
+        self.differential_model.setup(tree, &[], &selected_effectors);
     }
 }
 
@@ -80,7 +67,7 @@ where
 pub trait TransformationAccumulation<'a, Node, Load, NodeRef>
 where
     Load: Rigid,
-    Node: Nodelike<Load, NodeRef> + 'a,
+    Node: NodeLike<Load, NodeRef> + 'a,
 {
     fn accumulate(
         self,
@@ -91,7 +78,7 @@ where
 
 impl<'a, Node, Load, NodeRef, T> TransformationAccumulation<'a, Node, Load, NodeRef> for T
 where
-    Node: Nodelike<Load, NodeRef> + 'a,
+    Node: NodeLike<Load, NodeRef> + 'a,
     Load: Rigid,
     T: Iterator<Item = &'a Node>,
 {
@@ -149,7 +136,7 @@ mod tests {
 
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
-        fk.setup(&tree, &[&ref1, &ref2, &ref3, &ref4], &[&ref2, &ref3, &ref4]);
+        fk.setup(&tree, &[&ref2, &ref3, &ref4]);
         let res = fk.solve(&tree, &[0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
         let res = res.iter().map(|&el| el.to_owned()).collect_vec();
 

@@ -1,4 +1,4 @@
-use crate::{forward::TransformationAccumulation, DepthFirstIterable, Nodelike, Rigid};
+use crate::{forward::TransformationAccumulation, DepthFirstIterable, NodeLike, Rigid};
 use itertools::{izip, Itertools};
 use num_traits::Float;
 #[cfg(feature = "rayon")]
@@ -12,6 +12,10 @@ pub enum ComputeSelection {
 }
 
 /// A kinematic model that can compute a configuration and its partial derivties (Jacobian matrix)
+///
+/// It currently has one implementor and is doing the heavy lifting for all `classical`
+/// (i.e., differential) kinematics functions by constructing the Jacobian matrix required
+/// for most inverse models.
 pub trait Differentiable<F: Float> {
     // Document this (blog). It's required for returning a reference to internal data
     // type Data<'a>
@@ -24,7 +28,7 @@ pub trait Differentiable<F: Float> {
     fn effectors(&self) -> Vec<&[F]>;
 
     /// compute the jacobian matrix
-    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<&I>, selected_effectors: &HashSet<&I>)
+    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &[&I], selected_effectors: &[&I])
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid<FloatType = F>,
@@ -40,6 +44,9 @@ pub trait Differentiable<F: Float> {
     fn rows(&self) -> usize;
     fn cols(&self) -> usize;
     fn dims(&self) -> (usize, usize);
+
+    /// get active joints (those that correspond to columns in the jacobian). Call [Differentiable::setup] first
+    fn active(&self) -> &[bool];
 }
 // Note: Won't make the trait itself generic. That would be cleaner but mean more overhead (i.e., requiring full qualifiers in compositions)
 
@@ -87,15 +94,27 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         &self.configuration
     }
 
+    fn active(&self) -> &[bool] {
+        &self.selected_joints
+    }
+
     // TODO accept slice and create the hashset internally
-    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &HashSet<&I>, selected_effectors: &HashSet<&I>)
+    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &[&I], selected_effectors: &[&I])
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug,
     {
-        self.selected_joints = tree.iter().map(|n| selected_joints.get(&n.id()).is_some()).collect();
+        let selected_effectors: HashSet<&I> = HashSet::from_iter(selected_effectors.iter().cloned());
         self.selected_effectors = tree.iter().map(|n| selected_effectors.get(&n.id()).is_some()).collect();
+
+        if selected_joints.len() == 0 {
+            self.selected_joints = vec![true; tree.len()];
+        } else {
+            let selected_joints: HashSet<&I> = HashSet::from_iter(tree.iter().map(|n| n.id()));
+            self.selected_joints = tree.iter().map(|n| selected_joints.get(&n.id()).is_some()).collect();
+        }
+
         self.offsets = tree
             .iter()
             .scan(0, |offset, node| {
@@ -108,8 +127,6 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
             .collect();
 
         self.sizes = tree.iter().map(|n| n.get().effector_size()).collect();
-        dbg!(&self.offsets);
-        dbg!(&self.selected_effectors);
 
         self.rows = tree
             .iter()
@@ -250,9 +267,8 @@ mod tests {
                 &"link2".to_string(),
                 &"link3".to_string(),
                 &"link4".to_string(),
-            ]
-            .into(),
-            &[&"link2".to_string(), &"link4".to_string()].into(),
+            ],
+            &[&"link2".to_string(), &"link4".to_string()],
         );
 
         jacobian.compute(

@@ -1,7 +1,7 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
 use crate::MannequinError;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
-use ndarray_linalg::Solve;
+use ndarray_linalg::{Inverse, Solve, QR};
 
 pub mod robot;
 
@@ -101,7 +101,26 @@ pub fn cross_3d<T>(
 
 #[allow(unused_variables)]
 pub fn solve_linear(matrix: ArrayView2<f64>, vector: ArrayView1<f64>, mut target: ArrayViewMut1<f64>) {
-    target.assign(&matrix.solve(&vector).expect("Cannot solve equations"));
+    dbg!(&matrix);
+    dbg!(&vector);
+
+    let (q, r) = matrix.qr().unwrap();
+
+    dbg!(r.shape());
+    dbg!(q.shape());
+    dbg!(vector.shape());
+
+    let pseudo_inverse = r.inv().unwrap().dot(&q.t());
+    dbg!(pseudo_inverse.shape());
+    let t = pseudo_inverse.dot(&vector);
+    dbg!(target.shape());
+    target.assign(&t);
+    // matrix.solve_t(&vector);
+    // dbg!(matrix.solve_t(&vector));
+    // dbg!(matrix.solve(&vector));
+    // dbg!();
+    // target.assign(&matrix.solve_t(&vector).expect("Cannot solve equations"));
+    // target.iter_mut().for_each(|x| *x = 0.0);
 }
 
 // TODO Move functions into `spatial.rs` module

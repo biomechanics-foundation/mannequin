@@ -1,10 +1,10 @@
 //! Implementation of a directionally iterable
 //! [arena allocated](https://en.wikipedia.org/wiki/Region-based_memory_management)
 //! tree implementation, which supports depth- and breadth-first element iteration.
-//! Iteration uses references and if therefore slower than the implementation in the [depth]
-//! and [breadth] suubmodules.
+//! Iteration uses references and if therefore slower than the implementation in the [super::depth]
+//! and [super::breadth] suubmodules.
 
-use super::iterables::{BaseDirectionIterable, DirectionIterable, Nodelike};
+use super::iterables::{BaseDirectionIterable, DirectionIterable, NodeLike};
 use super::{BreadthFirstIterator, DepthFirstArenaTree, DepthFirstIterator};
 use crate::MannequinError;
 use core::fmt;
@@ -55,7 +55,7 @@ impl<Load, NodeRef> ArenaNode<Load, NodeRef> {
     }
 }
 
-impl<Load, NodeRef> Nodelike<Load, NodeRef> for ArenaNode<Load, NodeRef>
+impl<Load, NodeRef> NodeLike<Load, NodeRef> for ArenaNode<Load, NodeRef>
 where
     NodeRef: Clone,
 {
@@ -71,8 +71,9 @@ where
         self.depth
     }
 
-    fn id(&self) -> NodeRef {
-        self.id.clone()
+    // FIXME ... why a clone here
+    fn id(&self) -> &NodeRef {
+        &self.id //.clone()
     }
 }
 
@@ -92,8 +93,8 @@ where
 /// Iterable tree that uses arena allocation and allows for
 /// unoptimized (possibly slow) iteration/traversal in both
 /// directions: breadth-first and depth-first.
-/// Can be converted to a [DepthFirstIterable] implementation,
-/// namely [DepthFirstArenaTree], via a trait method or with `into()`
+/// Can be converted to a [super::DepthFirstIterable] implementation,
+/// namely [super::DepthFirstArenaTree], via a trait method or with `into()`
 ///
 /// The tree is mutable, that is, adding nodes possible, unlike in
 /// the trees optimized for a single direction.
@@ -179,7 +180,7 @@ where
     fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>> {
         let id = node.id();
         // can we rely on this check?
-        self.node_by_id(&id).ok_or(MannequinError::UnknownNode(id))?;
+        self.node_by_id(&id).ok_or(MannequinError::UnknownNode(id.clone()))?;
 
         // FIXME: map node.children to the nodes (don't loop over everything)
         Ok(self
@@ -246,7 +247,7 @@ where
         let index = self.nodes.len();
 
         // First check whether we can add the node (i.e., id not used yet)
-        if self.nodes.iter().any(|n| n.id() == node_id) {
+        if self.nodes.iter().any(|n| *n.id() == node_id) {
             return Err(MannequinError::NotUnique(node_id));
         }
         let parent_index = parent.index;

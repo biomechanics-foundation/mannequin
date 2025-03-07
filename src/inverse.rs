@@ -72,29 +72,37 @@ where
         selected_joints: &[&<RB as Rigid>::NodeId],
         selected_effectors: &[&<RB as Rigid>::NodeId],
     ) {
-        let selected_effectors = HashSet::from_iter(selected_effectors.iter().cloned());
-        let selected_joints = HashSet::from_iter(selected_joints.iter().cloned());
         self.differential_model
             .setup(tree, &selected_joints, &selected_effectors);
     }
 
     fn solve(&mut self, tree: &IT, params: &mut [F], targets: &[F]) -> Self::Info {
-        self.differential_model.compute(tree, params, ComputeSelection::All);
-
         let mut counter = 0;
         let mut error: F;
+        let mut result = vec![F::zero(); self.differential_model.active().iter().filter(|i| **i).count()];
         loop {
+            self.differential_model.compute(tree, params, ComputeSelection::All);
+            dbg!(&params);
+            dbg!(self.differential_model.flat_effectors());
+            dbg!(self.differential_model.effectors());
             let diff = izip!(self.differential_model.flat_effectors(), targets)
                 .map(|(x, y)| *x - *y)
                 .collect_vec();
+
+            dbg!(&diff);
 
             RB::solve_linear(
                 self.differential_model.jacobian(),
                 self.differential_model.rows(),
                 self.differential_model.cols(),
                 &diff,
-                params,
+                &mut result,
             );
+
+            izip!(params.iter_mut(), self.differential_model.active().iter())
+                .filter(|(_, a)| **a)
+                .zip(result.iter())
+                .for_each(|((p, _), r)| *p = *r);
 
             error = diff.iter().map(|x| *x * *x).sum();
             dbg!(&error);
@@ -123,7 +131,7 @@ mod test {
     use crate::ndarray::robot::{Axis, LinkNodeId, Segment};
     use crate::{DepthFirstArenaTree, DifferentiableModel, DirectedArenaTree, DirectionIterable};
     use approx::assert_abs_diff_eq;
-    use ndarray::{prelude::*, Order};
+    use ndarray::prelude::*;
 
     #[test]
     fn test_ik() {
@@ -149,7 +157,9 @@ mod test {
         tree.add(link5, "link5".to_string(), &ref4).unwrap();
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
-        let mut ik = DifferentialInverseModel::new(42, 10, 0.01, DifferentiableModel::new());
+        // let mut ik = DifferentialInverseModel::new(42, 10, 0.01, DifferentiableModel::new());
+        let n_iterations = 1;
+        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new());
 
         ik.setup(
             &tree,
@@ -164,13 +174,15 @@ mod test {
 
         let effectors = vec![vec![20.0, 0.0, 0.0], vec![20.0, 10.0, 0.0]];
         let effectors = effectors.into_iter().flatten().collect_vec();
-        let mut param = vec![0.0; 5];
+        // let mut param = vec![0.0; 5];
+        let mut param = vec![0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2, 0.0];
 
         let result = ik.solve(&tree, &mut param, &effectors);
 
-        assert_eq!(result.iteration_count, 10);
+        assert_eq!(result.iteration_count, n_iterations);
         dbg!(param);
         dbg!(result);
+        // assert!(x.abs_diff_eq(&array![1., -2., -2.], 1e-9));
         // assert_abs_diff_eq!(result, target, epsilon = 1e-6);
     }
 }

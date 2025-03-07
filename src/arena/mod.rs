@@ -11,4 +11,4 @@ pub use breadth::BreadthFirstIterator;
 pub use depth::{DepthFirstArenaTree, DepthFirstIterator};
 pub use directed::{ArenaIndex, ArenaNode, DirectedArenaTree};
 use iterables::BaseDirectionIterable;
-pub use iterables::{BreadthFirstIterable, DepthFirstIterable, DirectionIterable, Nodelike};
+pub use iterables::{BreadthFirstIterable, DepthFirstIterable, DirectionIterable, NodeLike};
