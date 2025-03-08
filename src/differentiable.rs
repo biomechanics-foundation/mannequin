@@ -27,7 +27,6 @@ pub enum ComputeSelection {
 /// Jacobian matrix (partial derivatives) are useful in sovlers. They can be implemented in
 /// different ways [[1](https://ieeexplore.ieee.org/document/6177279)] which is the reason for this
 /// additional layer of abstraction.
-
 pub trait Differentiable<F: Float> {
     // Document this (blog). It's required for returning a reference to internal data
     // type Data<'a>
@@ -122,21 +121,21 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug,
     {
-        let selected_effectors: HashSet<&I> = HashSet::from_iter(selected_effectors.iter().cloned());
-        self.selected_effectors = tree.iter().map(|n| selected_effectors.get(&n.id()).is_some()).collect();
+        let selected_effectors: HashSet<&I> = HashSet::from_iter(selected_effectors.iter().copied());
+        self.selected_effectors = tree.iter().map(|n| selected_effectors.contains(&n.id())).collect();
 
-        if selected_joints.len() == 0 {
+        if selected_joints.is_empty() {
             self.selected_joints = vec![true; tree.len()];
         } else {
-            let selected_joints: HashSet<&I> = HashSet::from_iter(tree.iter().map(|n| n.id()));
-            self.selected_joints = tree.iter().map(|n| selected_joints.get(&n.id()).is_some()).collect();
+            let selected_joints: HashSet<&I> = HashSet::from_iter(selected_joints.iter().copied());
+            self.selected_joints = tree.iter().map(|n| selected_joints.contains(&n.id())).collect();
         }
 
         self.offsets = tree
             .iter()
             .scan(0, |offset, node| {
                 let result = Some(*offset);
-                if selected_effectors.get(&node.id()).is_some() {
+                if selected_effectors.contains(&node.id()) {
                     *offset += node.get().effector_size();
                 }
                 result
@@ -148,7 +147,7 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         self.rows = tree
             .iter()
             .map(|node| {
-                if selected_effectors.get(&node.id()).is_some() {
+                if selected_effectors.contains(&node.id()) {
                     node.get().effector_size()
                 } else {
                     0
@@ -157,7 +156,7 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
             .sum();
 
         self.cols = self.selected_joints.iter().filter(|&selected| *selected).count();
-        dbg!((self.rows, self.cols));
+        dbg!((&self.selected_joints, self.rows, self.cols));
 
         self.matrix.clear();
         self.matrix.resize(self.rows * self.cols, F::zero());

@@ -57,7 +57,7 @@ where
     }
 
     fn setup(&mut self, tree: &IT, selected_effectors: &[&<RB as Rigid>::NodeId]) {
-        self.differential_model.setup(tree, &[], &selected_effectors);
+        self.differential_model.setup(tree, &[], selected_effectors);
     }
 }
 

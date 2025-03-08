@@ -86,8 +86,7 @@ where
         selected_joints: &[&<RB as Rigid>::NodeId],
         selected_effectors: &[&<RB as Rigid>::NodeId],
     ) {
-        self.differential_model
-            .setup(tree, &selected_joints, &selected_effectors);
+        self.differential_model.setup(tree, selected_joints, selected_effectors);
     }
 
     fn solve(&mut self, tree: &IT, params: &mut [F], targets: &[F]) -> Self::Info {

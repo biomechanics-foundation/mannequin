@@ -186,7 +186,7 @@ where
     fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>> {
         let id = node.id();
         // can we rely on this check?
-        self.node_by_id(&id).ok_or(MannequinError::UnknownNode(id.clone()))?;
+        self.node_by_id(id).ok_or(MannequinError::UnknownNode(id.clone()))?;
 
         // FIXME: map node.children to the nodes (don't loop over everything)
         Ok(self
