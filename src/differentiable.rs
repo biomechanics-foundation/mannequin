@@ -1,3 +1,9 @@
+//! Algorithms useful for implementing differential kinematics (such as forward kinematics
+//! and partial derivatives (i.e., the Jacobian matrix).
+//!
+//! The algorithms are independent of
+//! the numerical backend and support [f32] and [f64] floating point representations.
+
 use crate::{forward::TransformationAccumulation, DepthFirstIterable, NodeLike, Rigid};
 use itertools::{izip, Itertools};
 use num_traits::Float;
@@ -5,57 +11,69 @@ use num_traits::Float;
 use rayon::prelude::*;
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
+/// Computation shares common intermediate results. This enum
+/// allows selecting which results should be computed.
 pub enum ComputeSelection {
+    /// Compute the forward kinematics
     EffectorsOnly,
+    /// Compute only the partial derivatives
     JacobianOnly,
+    /// Compute both
     All,
 }
 
-/// A kinematic model that can compute a configuration and its partial derivties (Jacobian matrix)
-///
-/// It currently has one implementor and is doing the heavy lifting for all `classical`
-/// (i.e., differential) kinematics functions by constructing the Jacobian matrix required
-/// for most inverse models.
+/// Mathematical, differentiable representation of a kinematic model. Implementers do the heavy
+/// lifting in [crate::ForwardModel] and [crate::DifferentialInverseModel] by computing the
+/// Jacobian matrix (partial derivatives) are useful in sovlers. They can be implemented in
+/// different ways [[1](https://ieeexplore.ieee.org/document/6177279)] which is the reason for this
+/// additional layer of abstraction.
+
 pub trait Differentiable<F: Float> {
     // Document this (blog). It's required for returning a reference to internal data
     // type Data<'a>
     // where
     //     Self: 'a; // https://github.com/rust-lang/rust/issues/87479
 
-    /// returns a reference to the internal data type
+    /// returns a reference to the internal data type . Call [Differentiable::compute] first.
     fn jacobian(&self) -> &[F];
+    /// Result of the forward kinematics stored in a flat `Vec` to be used in a gradient decent.
+    /// Call [Differentiable::compute] first.
     fn flat_effectors(&self) -> &[F];
+    /// Result of the forward kinematics as a nested `Vec`. Call [Differentiable::setup] first.
     fn effectors(&self) -> Vec<&[F]>;
 
-    /// compute the jacobian matrix
+    /// Prepare algorithms for computation. This avoids memory allocation when calling [Differentiable::compute].
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &[&I], selected_effectors: &[&I])
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug;
 
-    /// Compute is necessary as the structure holds the memory for the jacobian and the forward vector
+    /// Compute is necessary as the structure holds the memory for the jacobian and the forward vector.
+    /// Call [Differentiable::setup] first.
     fn compute<T, R, I>(&mut self, tree: &T, params: &[R::FloatType], selection: ComputeSelection)
     where
         T: DepthFirstIterable<R, I>,
         R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug;
 
+    /// Get the number of rows of the Jacobian matrix. Call [Differentiable::setup] first.
     fn rows(&self) -> usize;
+    /// Get the number of columns of the Jacobian matrix. Call [Differentiable::setup] first.
     fn cols(&self) -> usize;
-    fn dims(&self) -> (usize, usize);
+    /// Get the shape of the Jacobian matrix (rows, columns). Call [Differentiable::setup] first.
+    fn shape(&self) -> (usize, usize);
 
-    /// get active joints (those that correspond to columns in the jacobian). Call [Differentiable::setup] first
+    /// get active joints (those that correspond to columns in the jacobian).
+    /// Call [Differentiable::setup] first.
     fn active(&self) -> &[bool];
 }
-// Note: Won't make the trait itself generic. That would be cleaner but mean more overhead (i.e., requiring full qualifiers in compositions)
+// Note: Won't make the trait itself generic. That would be cleaner but mean more overhead
+// (i.e., requiring full qualifiers in compositions)
 
-/// A kinematic model that can compute a configuration
-/// And partial derivatives based on Vec
-///
-/// Base implementation that should be used in backend implementation as a composite.
-/// The composition of the Jacobian does not require a specific backend and can directly operate on
-/// a rust vector instead. All backends can operate on this structure without copying the data.
+/// Backend-agnostic implementation of algorithms for computing the forward kinematics
+/// and partial derivatives (i.e, Jacobian matrix) or the application in inverse kinematics
+/// solvers. Generic in the floating point representation.
 #[derive(Debug, Default)]
 pub struct DifferentiableModel<F: Float> {
     matrix: Vec<F>,
@@ -98,7 +116,6 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         &self.selected_joints
     }
 
-    // TODO accept slice and create the hashset internally
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &[&I], selected_effectors: &[&I])
     where
         T: DepthFirstIterable<R, I>,
@@ -157,7 +174,7 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         self.cols
     }
 
-    fn dims(&self) -> (usize, usize) {
+    fn shape(&self) -> (usize, usize) {
         (self.rows, self.cols)
     }
 
@@ -290,7 +307,7 @@ mod tests {
             [0.0, 0.0, 0.0, 0.0,]
         ];
 
-        assert_eq!(jacobian.dims(), (6, 4));
+        assert_eq!(jacobian.shape(), (6, 4));
         assert_abs_diff_eq!(result, target, epsilon = 1e-6);
     }
 }

@@ -1,5 +1,4 @@
-//! Data structure representing an arena tree in which the arena is sorted in depth-first
-//! order for faster access
+//! Implementations for depth-first traversal, optimazatized trees and tree conversion.
 
 use super::{
     iterables::OptimizedDirectionIterable, utils::sort_by_indices, ArenaIndex, ArenaNode, BaseDirectionIterable,
@@ -9,6 +8,10 @@ use crate::MannequinError;
 use itertools::Itertools;
 use std::{fmt::Debug, hash::Hash};
 
+/// Data structure representing an arena tree in which the arena is sorted in depth-first
+/// order for faster access
+///
+/// "Extends" [DirectedArenaTree] by composition.
 pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>);
 
 impl<Load, NodeId> From<DirectedArenaTree<Load, NodeId>> for DepthFirstArenaTree<Load, NodeId>
@@ -93,7 +96,7 @@ where
     }
 }
 
-/// Iterator for a depth-first iteration over an unsorted arena
+/// Iterator for a depth-first iteration over a tree that implements [super::DirectionIterable].
 pub struct DepthFirstIterator<'a, 'b, T, N>
 where
     'a: 'b,

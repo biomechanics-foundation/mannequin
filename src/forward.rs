@@ -1,15 +1,16 @@
-/*! Defines the payload carried by [NodeLike] in the context of kinematics/character animation */
-// FIXME
-#![allow(unused_variables, dead_code)]
+//! Interface and basic implementor for the forward kinematic model.
+//!
+//! Contains additional useful extension to the iterators over a tree
+//! that can be shared by implementers of the trait.
 
-use std::{collections::HashSet, marker::PhantomData};
+use std::marker::PhantomData;
 
 use num_traits::Float;
 
 use crate::{differentiable::ComputeSelection, DepthFirstIterable, Differentiable, NodeLike, Rigid};
 
-/// Trait representing a stateful forward kinematics algorithm. It allows selecting the effectors and thus a specific,
-/// (or multiple) kinematic chain(s).
+/// Trait representing a stateful forward kinematics algorithm. It allows selecting the effectors to be
+/// computed and thus a specific (or multiple) kinematic chain(s).
 pub trait Forward<IT, RB>
 where
     IT: DepthFirstIterable<RB, RB::NodeId>,
@@ -19,13 +20,12 @@ where
     fn solve(&mut self, tree: &IT, params: &[RB::FloatType]) -> Vec<&[RB::FloatType]>;
 }
 
-/// Default forward kinematics that is a thin wrapper around a [Differentiable] kinematics model.
+/// Default forward kinematics that is only a thin wrapper around an [Differentiable] instance.
 pub struct ForwardModel<F, D>
 where
     F: Float,
     D: Differentiable<F>,
 {
-    _max_depth: usize,
     differential_model: D,
     p: PhantomData<F>,
 }
@@ -35,10 +35,9 @@ where
     F: Float,
     D: Differentiable<F>,
 {
-    pub fn new(_max_depth: usize, model: D) -> Self {
+    pub fn new(differential_model: D) -> Self {
         Self {
-            _max_depth,
-            differential_model: model,
+            differential_model,
             p: PhantomData,
         }
     }
@@ -103,6 +102,7 @@ where
         )
     }
 }
+
 #[cfg(test)]
 mod tests {
 
@@ -117,7 +117,7 @@ mod tests {
     #[test]
     fn test_fk() {
         let mut tree = DirectedArenaTree::new();
-        let mut fk = ForwardModel::new(10, DifferentiableModel::new());
+        let mut fk = ForwardModel::new(DifferentiableModel::new());
 
         let mut trafo = Segment::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);

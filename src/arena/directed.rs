@@ -1,6 +1,8 @@
-//! Implementation of a directionally iterable
-//! [arena allocated](https://en.wikipedia.org/wiki/Region-based_memory_management)
-//! tree implementation, which supports depth- and breadth-first element iteration.
+//! Directionally iterable,
+//! [arena-memory-allocated](https://en.wikipedia.org/wiki/Region-based_memory_management)
+//! tree implementation, which supports depth- and breadth-first node iteration, and
+//! related node implementation.
+//!
 //! Iteration uses references and if therefore slower than the implementation in the [super::depth]
 //! and [super::breadth] suubmodules.
 
@@ -11,10 +13,14 @@ use core::fmt;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
+/// Position index in an arena memory allocation.
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct ArenaIndex(pub usize);
 
-/// A node structure to be used in an arena allocated tree. Fields are used to speed up iteration
+/// The node datatype used throughout this crate and used in all implementers of
+/// the tree traits in [super::iterables].
+///
+/// Some of the available Fields are used to speed up iteration.
 #[derive(Debug)]
 pub struct ArenaNode<Load, NodeId> {
     /// The user-defined load that the node owns
@@ -90,8 +96,8 @@ where
     }
 }
 
-/// Iterable tree that uses arena allocation and allows for
-/// unoptimized (possibly slow) iteration/traversal in both
+/// Iterable tree that uses arena-memory-allocation and allows for
+/// unoptimized (possibly slow) iteration/traversal in two
 /// directions: breadth-first and depth-first.
 /// Can be converted to a [super::DepthFirstIterable] implementation,
 /// namely [super::DepthFirstArenaTree], via a trait method or with `into()`

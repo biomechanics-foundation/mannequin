@@ -1,5 +1,8 @@
-//! [Arena allocated](https://en.wikipedia.org/wiki/Region-based_memory_management)
-//! tree structure for fast, directional (i.e., breadth-first/depth-first) traversal.
+//! [Arena memory allocated](https://en.wikipedia.org/wiki/Region-based_memory_management)
+//! tree structures for fast, directional (i.e., breadth-first/depth-first) traversal.
+//!
+//! **TBD Warning:** Breadth-first is not used in this crate yet, so the implementation is currently
+//! of lower priority.
 
 pub mod breadth;
 pub mod depth;

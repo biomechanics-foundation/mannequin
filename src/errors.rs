@@ -1,5 +1,10 @@
+//! Provides the error type that will be eventually used
+//! throughout this crate.
+
 use thiserror::Error;
 
+/// The error type that will be eventually used
+/// throughout this crate
 #[derive(Error, Debug)]
 pub enum MannequinError<NodeID> {
     // Internal errors

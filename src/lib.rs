@@ -35,7 +35,7 @@ pub use arena::{
 pub use differentiable::{Differentiable, DifferentiableModel};
 pub use errors::MannequinError;
 pub use forward::{Forward, ForwardModel};
-pub use inverse::Inverse;
+pub use inverse::{DifferentialInverseModel, Inverse};
 pub use mannequin::{Mannequin, Rigid};
 // Backends
 #[cfg(feature = "ndarray")]

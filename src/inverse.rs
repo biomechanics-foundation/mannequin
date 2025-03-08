@@ -1,20 +1,28 @@
-use std::{collections::HashSet, fmt::Debug, iter::Sum};
+//! Interface and basic implementor for the inverse kinematic model.
+
+use std::{fmt::Debug, iter::Sum};
 
 use itertools::{izip, Itertools};
 use num_traits::Float;
 
 use crate::{differentiable::ComputeSelection, DepthFirstIterable, Differentiable, Rigid};
 
-/// Trait representing a stateful inverse kinematics algorithm.
+/// Trait representing a stateful forward kinematics algorithm.
+///
+/// It allows selecting the effectors to be computed and thus a specific (or multiple) kinematic chain(s), and
+/// which joints are active (can be moved).
 pub trait Inverse<IT, RB>
 where
     IT: DepthFirstIterable<RB, RB::NodeId>,
     RB: Rigid,
 {
+    /// The return type com [Inverse::solve] that carries information about the outcome
     type Info;
 
+    /// Preparation the computation (memory allocation, and joint/effector selection).
     fn setup(&mut self, tree: &IT, selected_joints: &[&<RB as Rigid>::NodeId], selected_effectors: &[&RB::NodeId]);
 
+    /// Compute the inverse kinematics
     fn solve(
         &mut self,
         tree: &IT,
@@ -23,13 +31,20 @@ where
     ) -> Self::Info;
 }
 
+/// Information about the solution for the dfault, differential IK solver
 #[derive(Debug, Clone)]
-pub struct InverseKinematicsInfo<F: Float> {
+pub struct DiffIKInfo<F: Float> {
+    /// Number of required iterations (indicates convergence)
     pub iteration_count: usize,
+    /// The final squared error
     pub squared_error: F,
 }
 
-/// Reference implementation that is agnostic of the backend
+/// Reference implementation of a differential IK solver that is agnostic of the backend.
+///
+/// It delegates linear algebra operations (solving the system of linear equations) to
+/// backend-specific implementers of [crate::Rigid], and uses a backend-agnostic
+/// [Differentiable] for computing the Jacobian matrix.
 pub struct DifferentialInverseModel<F, D>
 where
     F: Float,
@@ -62,9 +77,8 @@ where
     RB: Rigid<FloatType = F>,
     F: Float + Sum + Debug,
     D: Differentiable<F>,
-    // DM: 'b + Differentiable<Data<'b> = &'b [f64]>, // Cannot not use Self::Data here (!?)
 {
-    type Info = InverseKinematicsInfo<F>;
+    type Info = DiffIKInfo<F>;
 
     fn setup(
         &mut self,
