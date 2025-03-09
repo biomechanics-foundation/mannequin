@@ -54,6 +54,7 @@ where
     max_iterations_count: usize,
     min_error: F,
     differential_model: D,
+    scale_difference: F,
 }
 
 impl<F, D> DifferentialInverseModel<F, D>
@@ -61,12 +62,19 @@ where
     F: Float,
     D: Differentiable<F>,
 {
-    pub fn new(_max_depth: usize, max_iterations_count: usize, min_error: F, differential_model: D) -> Self {
+    pub fn new(
+        _max_depth: usize,
+        max_iterations_count: usize,
+        min_error: F,
+        differential_model: D,
+        scale_difference: F,
+    ) -> Self {
         Self {
             _max_depth,
             max_iterations_count,
             min_error,
             differential_model,
+            scale_difference,
         }
     }
 }
@@ -95,14 +103,19 @@ where
         let mut result = vec![F::zero(); self.differential_model.active().iter().filter(|i| **i).count()];
         loop {
             self.differential_model.compute(tree, params, ComputeSelection::All);
-            dbg!(&params);
+            // dbg!(&params);
             dbg!(self.differential_model.flat_effectors());
-            dbg!(self.differential_model.effectors());
-            let diff = izip!(self.differential_model.flat_effectors(), targets)
-                .map(|(x, y)| *x - *y)
+            // dbg!(self.differential_model.effectors());
+            let mut diff = izip!(targets, self.differential_model.flat_effectors())
+                .map(|(x, y)| (*x - *y))
                 .collect_vec();
 
-            dbg!(&diff);
+            // dbg!(&self.differential_model.jacobian());
+            error = diff.iter().map(|x| *x * *x).sum();
+            dbg!(&error);
+            // dbg!(&diff);
+
+            diff.iter_mut().for_each(|x| *x = *x * self.scale_difference);
 
             RB::solve_linear(
                 self.differential_model.jacobian(),
@@ -112,13 +125,12 @@ where
                 &mut result,
             );
 
+            // dbg!(&result);
+            // dbg!(&params);
             izip!(params.iter_mut(), self.differential_model.active().iter())
                 .filter(|(_, a)| **a)
                 .zip(result.iter())
-                .for_each(|((p, _), r)| *p = *r);
-
-            error = diff.iter().map(|x| *x * *x).sum();
-            dbg!(&error);
+                .for_each(|((p, _), r)| *p = *p + *r);
 
             if error < self.min_error {
                 break;
@@ -141,6 +153,7 @@ mod test {
     // The `ndarray` as a reference implementation is used for testing
 
     use super::*;
+    use crate::arena::iterables::{BaseDirectionIterable, OptimizedDirectionIterable};
     use crate::ndarray::robot::{Axis, LinkNodeId, Segment};
     use crate::{DepthFirstArenaTree, DifferentiableModel, DirectedArenaTree, DirectionIterable};
     use approx::assert_abs_diff_eq;
@@ -171,8 +184,8 @@ mod test {
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
         // let mut ik = DifferentialInverseModel::new(42, 10, 0.01, DifferentiableModel::new());
-        let n_iterations = 1;
-        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new());
+        let n_iterations = 13;
+        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 1.0);
 
         ik.setup(
             &tree,
@@ -193,6 +206,58 @@ mod test {
         let result = ik.solve(&tree, &mut param, &effectors);
 
         assert_eq!(result.iteration_count, n_iterations);
+        dbg!(param);
+        dbg!(result);
+        // assert!(x.abs_diff_eq(&array![1., -2., -2.], 1e-9));
+        // assert_abs_diff_eq!(result, target, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_tentacle() {
+        let mut tree = DirectedArenaTree::<Segment, LinkNodeId>::new();
+
+        let mut trafo = Segment::neutral_element();
+        trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
+
+        let mut last_node_id = tree.set_root(Segment::new(&trafo, Axis::RotationZ, None), "link_0".into());
+
+        for i in 1..9 {
+            last_node_id = tree
+                .add(
+                    Segment::new(&trafo, Axis::RotationZ, None),
+                    format!("link_{i}"),
+                    &last_node_id,
+                )
+                .unwrap();
+        }
+
+        tree.add(
+            Segment::new(&trafo, Axis::RotationZ, Some(trafo.clone())),
+            "link_9".into(),
+            &last_node_id,
+        )
+        .unwrap();
+
+        // finalize tree
+        let tree: DepthFirstArenaTree<_, _> = tree.into();
+        tree.iter().for_each(|n| {
+            dbg!(&n);
+        });
+
+        let n_iterations = 13;
+        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 0.001);
+
+        ik.setup(&tree, &[], &[&"link_9".to_string()]);
+
+        let effectors = vec![vec![00.0, 20.0, 0.0]];
+
+        let effectors = effectors.into_iter().flatten().collect_vec();
+        // let mut param = vec![0.0; 5];
+        let mut param = vec![0.0; 10];
+
+        let result = ik.solve(&tree, &mut param, &effectors);
+
+        // assert_eq!(result.iteration_count, n_iterations);
         dbg!(param);
         dbg!(result);
         // assert!(x.abs_diff_eq(&array![1., -2., -2.], 1e-9));

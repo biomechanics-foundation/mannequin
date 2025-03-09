@@ -1,7 +1,7 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
 use crate::MannequinError;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
-use ndarray_linalg::{Inverse, Solve, QR};
+use ndarray_linalg::{Inverse, LeastSquaresSvd, Solve, QR};
 
 pub mod robot;
 
@@ -101,20 +101,35 @@ pub fn cross_3d<T>(
 
 #[allow(unused_variables)]
 pub fn solve_linear(matrix: ArrayView2<f64>, vector: ArrayView1<f64>, mut target: ArrayViewMut1<f64>) {
-    dbg!(&matrix);
-    dbg!(&vector);
+    // dbg!(&matrix);
+    // dbg!(matrix.t().dot(&matrix));
+    // dbg!(&vector);
 
-    let (q, r) = matrix.qr().unwrap();
+    // This works. No idea about performance
 
-    dbg!(r.shape());
-    dbg!(q.shape());
-    dbg!(vector.shape());
+    let mut pseudo_inverse = matrix.t().dot(&matrix);
+    // regularization
+    pseudo_inverse = &pseudo_inverse + 1e-5 * Array2::<f64>::eye(pseudo_inverse.nrows());
+    pseudo_inverse = pseudo_inverse.inv().unwrap().dot(&matrix.t());
+    target.assign(&pseudo_inverse.dot(&vector));
 
-    let pseudo_inverse = r.inv().unwrap().dot(&q.t());
-    dbg!(pseudo_inverse.shape());
-    let t = pseudo_inverse.dot(&vector);
-    dbg!(target.shape());
-    target.assign(&t);
+    // let result = matrix.least_squares(&vector).unwrap();
+    // target.assign(&result.solution);
+    // if matrix.rank()
+
+    // let (q, r) = matrix.qr().unwrap();
+    // let left_inverse = r.inv().unwrap().dot(&q.t());
+
+    // this might works but only if the rank is full (over-determined system)
+    // println!("{matrix}");
+    // println!("{q}");
+    // println!("{r}");
+    // println!("{left_inverse}");
+    // dbg!(left_inverse.dot(&matrix));
+    // // dbg!(left_inverse.shape());
+    // let t = left_inverse.dot(&vector);
+    // // dbg!(target.shape());
+    // target.assign(&t);
     // matrix.solve_t(&vector);
     // dbg!(matrix.solve_t(&vector));
     // dbg!(matrix.solve(&vector));

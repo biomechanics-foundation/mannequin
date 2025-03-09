@@ -121,6 +121,8 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug,
     {
+        // todo: fail if node not in tree.
+
         let selected_effectors: HashSet<&I> = HashSet::from_iter(selected_effectors.iter().copied());
         self.selected_effectors = tree.iter().map(|n| selected_effectors.contains(&n.id())).collect();
 
