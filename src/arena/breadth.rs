@@ -1,5 +1,6 @@
-//! TBD. Implement breadth first optimized arena allocated tree
-// TODO Breadth-first Implementation
+//! **TBD.** Breadth-first traversal implementations
+
+// TODO Add Breadth-first Implementation
 
 use super::{ArenaIndex, ArenaNode, DirectedArenaTree};
 

@@ -24,18 +24,19 @@
 
 pub mod arena;
 pub mod differentiable;
-pub mod dummy;
 pub mod errors;
+pub mod forward;
+pub mod inverse;
 pub mod mannequin;
-pub mod rigid;
 
 pub use arena::{
-    BreadthFirstIterable, DepthFirstArenaTree, DepthFirstIterable, DirectedArenaTree, DirectionIterable, Nodelike,
+    BreadthFirstIterable, DepthFirstArenaTree, DepthFirstIterable, DirectedArenaTree, DirectionIterable, NodeLike,
 };
-pub use differentiable::{Differentiable, VecJacobian};
+pub use differentiable::{Differentiable, DifferentiableModel};
 pub use errors::MannequinError;
-pub use mannequin::{Forward, Inverse, Mannequin};
-pub use rigid::{accumulate, Rigid, TransformationAccumulation};
+pub use forward::{Forward, ForwardModel};
+pub use inverse::{DifferentialInverseModel, Inverse};
+pub use mannequin::{Mannequin, Rigid};
 // Backends
 #[cfg(feature = "ndarray")]
 pub mod ndarray;

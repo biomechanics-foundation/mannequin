@@ -1,68 +1,9 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
-use crate::{DepthFirstIterable, Differentiable, MannequinError, Rigid, VecJacobian};
-use ndarray::Order;
+use crate::MannequinError;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::hash::Hash;
+use ndarray_linalg::{Inverse, LeastSquaresSvd, Solve, QR};
 
-pub mod default;
-
-/// Jacobian using ndarray for numerics
-#[derive(Debug, Default)]
-pub struct Jacobian {
-    base: VecJacobian,
-}
-
-/// Thin wrapper around the default implementation
-impl Jacobian {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl Differentiable for Jacobian {
-    // Note: could ArrayView too
-    type Data<'a> = ArrayView2<'a, f64>;
-
-    fn jacobian(&self) -> Self::Data<'_> {
-        let data = self.base.jacobian();
-        let result = ArrayView1::<f64>::from(data.as_slice())
-            .into_shape_with_order(((self.base.rows(), self.base.cols()), Order::ColumnMajor))
-            .unwrap();
-        result
-    }
-
-    fn data(&mut self) -> &mut [f64] {
-        self.base.data()
-    }
-
-    fn setup<T, R, I>(&mut self, tree: &T, active_joints: &HashSet<I>, active_points: &HashSet<I>)
-    where
-        T: DepthFirstIterable<R, I>,
-        R: Rigid,
-        I: Eq + Clone + Hash + Debug,
-    {
-        self.base.setup(tree, active_joints, active_points)
-    }
-
-    fn rows(&self) -> usize {
-        self.base.rows()
-    }
-
-    fn cols(&self) -> usize {
-        self.base.cols()
-    }
-
-    fn compute<T, R, I>(&mut self, tree: &T, params: &[<R as Rigid>::Parameter])
-    where
-        T: DepthFirstIterable<R, I>,
-        R: Rigid,
-        I: Eq + Clone + Hash + Debug,
-    {
-        self.base.compute(tree, params)
-    }
-}
+pub mod robot;
 
 /// Creates a homogeneous, 4x4 rotation matrix around the x axis.
 pub fn rotate_x_4x4(param: f64) -> Array2<f64> {
@@ -133,8 +74,8 @@ pub fn translation<T>(param: &[f64]) -> Result<Array2<f64>, MannequinError<T>> {
     Ok(result)
 }
 
-/// inverts a homogeneous, 4x4 tranformation matrix.
-pub fn invert_tranformation_4x4(trafo: &Array2<f64>) -> Array2<f64> {
+/// inverts a homogeneous, 4x4 transformation matrix.
+pub fn invert_transformation_4x4(trafo: &Array2<f64>) -> Array2<f64> {
     let mut result = Array2::<f64>::eye(4);
     let rot = trafo.slice(s![..3, ..3]);
     result.slice_mut(s![..3, ..3]).assign(&rot.t());
@@ -157,3 +98,47 @@ pub fn cross_3d<T>(
         Ok(())
     }
 }
+
+#[allow(unused_variables)]
+pub fn solve_linear(matrix: ArrayView2<f64>, vector: ArrayView1<f64>, mut target: ArrayViewMut1<f64>) {
+    // dbg!(&matrix);
+    // dbg!(matrix.t().dot(&matrix));
+    // dbg!(&vector);
+
+    // This works. No idea about performance
+
+    let mut pseudo_inverse = matrix.t().dot(&matrix);
+    // regularization
+    pseudo_inverse = &pseudo_inverse + 1e-5 * Array2::<f64>::eye(pseudo_inverse.nrows());
+    pseudo_inverse = pseudo_inverse.inv().unwrap().dot(&matrix.t());
+    target.assign(&pseudo_inverse.dot(&vector));
+
+    // let result = matrix.least_squares(&vector).unwrap();
+    // target.assign(&result.solution);
+    // if matrix.rank()
+
+    // let (q, r) = matrix.qr().unwrap();
+    // let left_inverse = r.inv().unwrap().dot(&q.t());
+
+    // this might works but only if the rank is full (over-determined system)
+    // println!("{matrix}");
+    // println!("{q}");
+    // println!("{r}");
+    // println!("{left_inverse}");
+    // dbg!(left_inverse.dot(&matrix));
+    // // dbg!(left_inverse.shape());
+    // let t = left_inverse.dot(&vector);
+    // // dbg!(target.shape());
+    // target.assign(&t);
+    // matrix.solve_t(&vector);
+    // dbg!(matrix.solve_t(&vector));
+    // dbg!(matrix.solve(&vector));
+    // dbg!();
+    // target.assign(&matrix.solve_t(&vector).expect("Cannot solve equations"));
+    // target.iter_mut().for_each(|x| *x = 0.0);
+}
+
+// TODO Move functions into `spatial.rs` module
+// Make a struct implementing Rigid that has a generic member `nested` with a trait NestedRigid
+// that delegates everything to `nested` but with ndarray types
+// then move the robot implementation to example (unless used in benchmarks, then leave it in (as a feature maybe)).

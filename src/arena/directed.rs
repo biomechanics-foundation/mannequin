@@ -1,20 +1,26 @@
-//! Implementation of a directionally iterable
-//! [arena allocated](https://en.wikipedia.org/wiki/Region-based_memory_management)
-//! tree implementation, which supports depth- and breadth-first element iteration.
-//! Iteration uses references and if therefore slower than the implementation in the [depth]
-//! and [breadth] suubmodules.
+//! Directionally iterable,
+//! [arena-memory-allocated](https://en.wikipedia.org/wiki/Region-based_memory_management)
+//! tree implementation, which supports depth- and breadth-first node iteration, and
+//! related node implementation.
+//!
+//! Iteration uses references and if therefore slower than the implementation in the [super::depth]
+//! and [super::breadth] suubmodules.
 
-use super::iterables::{BaseDirectionIterable, DirectionIterable, Nodelike};
+use super::iterables::{BaseDirectionIterable, DirectionIterable, NodeLike};
 use super::{BreadthFirstIterator, DepthFirstArenaTree, DepthFirstIterator};
 use crate::MannequinError;
 use core::fmt;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
+/// Position index in an arena memory allocation.
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct ArenaIndex(pub usize);
 
-/// A node structure to be used in an arena allocated tree. Fields are used to speed up iteration
+/// The node datatype used throughout this crate and used in all implementers of
+/// the tree traits in [super::iterables].
+///
+/// Some of the available Fields are used to speed up iteration.
 #[derive(Debug)]
 pub struct ArenaNode<Load, NodeId> {
     /// The user-defined load that the node owns
@@ -55,7 +61,7 @@ impl<Load, NodeRef> ArenaNode<Load, NodeRef> {
     }
 }
 
-impl<Load, NodeRef> Nodelike<Load, NodeRef> for ArenaNode<Load, NodeRef>
+impl<Load, NodeRef> NodeLike<Load, NodeRef> for ArenaNode<Load, NodeRef>
 where
     NodeRef: Clone,
 {
@@ -71,8 +77,9 @@ where
         self.depth
     }
 
-    fn id(&self) -> NodeRef {
-        self.id.clone()
+    // FIXME ... why a clone here
+    fn id(&self) -> &NodeRef {
+        &self.id //.clone()
     }
 }
 
@@ -89,11 +96,11 @@ where
     }
 }
 
-/// Iterable tree that uses arena allocation and allows for
-/// unoptimized (possibly slow) iteration/traversal in both
+/// Iterable tree that uses arena-memory-allocation and allows for
+/// unoptimized (possibly slow) iteration/traversal in two
 /// directions: breadth-first and depth-first.
-/// Can be converted to a [DepthFirstIterable] implementation,
-/// namely [DepthFirstArenaTree], via a trait method or with `into()`
+/// Can be converted to a [super::DepthFirstIterable] implementation,
+/// namely [super::DepthFirstArenaTree], via a trait method or with `into()`
 ///
 /// The tree is mutable, that is, adding nodes possible, unlike in
 /// the trees optimized for a single direction.
@@ -109,7 +116,7 @@ pub struct DirectedArenaTree<Load, NodeID> {
 }
 
 impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
-    /// Contructor. Sorting indicates whether the elements are stored to
+    /// Constructor. Sorting indicates whether the elements are stored to
     /// make either deoth or breadth first traversal efficient (slow insertion). `None` indicates
     /// that the data will be unordered (fast insertion, slower traversal).
     pub fn with_capacity(capacity: usize) -> Self {
@@ -124,7 +131,7 @@ impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
         }
     }
 
-    /// Contructor. Sorting indicates whether the elements are stored to
+    /// Constructor. Sorting indicates whether the elements are stored to
     /// make either deoth or breadth first traversal efficient (slow insertion). `None` indicates
     /// that the data will be unordered (fast insertion, slower traversal).
     pub fn new() -> Self {
@@ -179,7 +186,7 @@ where
     fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>> {
         let id = node.id();
         // can we rely on this check?
-        self.node_by_id(&id).ok_or(MannequinError::UnkonwnNode(id))?;
+        self.node_by_id(id).ok_or(MannequinError::UnknownNode(id.clone()))?;
 
         // FIXME: map node.children to the nodes (don't loop over everything)
         Ok(self
@@ -196,6 +203,14 @@ where
     fn node_by_id(&self, node_ref: &NodeId) -> Option<&Self::Node> {
         let index = self.lookup.get(node_ref)?;
         self.nodes.get(index.0)
+    }
+
+    fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
     }
 }
 
@@ -232,13 +247,13 @@ where
     fn add(&mut self, load: Load, node_id: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>> {
         let parent = self
             .node_by_id(parent)
-            .ok_or(MannequinError::UnkonwnNode(parent.clone()))?;
+            .ok_or(MannequinError::UnknownNode(parent.clone()))?;
         // println!("Adding {:?} to parent {:?}", load, parent);
 
         let index = self.nodes.len();
 
         // First check whether we can add the node (i.e., id not used yet)
-        if self.nodes.iter().any(|n| n.id() == node_id) {
+        if self.nodes.iter().any(|n| *n.id() == node_id) {
             return Err(MannequinError::NotUnique(node_id));
         }
         let parent_index = parent.index;

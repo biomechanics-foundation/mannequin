@@ -1,5 +1,4 @@
-//! Data structure representing an arena tree in which the arena is sorted in depth-frist
-//! order for faster access
+//! Implementations for depth-first traversal, optimazatized trees and tree conversion.
 
 use super::{
     iterables::OptimizedDirectionIterable, utils::sort_by_indices, ArenaIndex, ArenaNode, BaseDirectionIterable,
@@ -9,6 +8,10 @@ use crate::MannequinError;
 use itertools::Itertools;
 use std::{fmt::Debug, hash::Hash};
 
+/// Data structure representing an arena tree in which the arena is sorted in depth-first
+/// order for faster access
+///
+/// "Extends" [DirectedArenaTree] by composition.
 pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>);
 
 impl<Load, NodeId> From<DirectedArenaTree<Load, NodeId>> for DepthFirstArenaTree<Load, NodeId>
@@ -53,6 +56,14 @@ where
     fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node> {
         self.0.node_by_id(node_id)
     }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl<Load, NodeId> OptimizedDirectionIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
@@ -85,7 +96,7 @@ where
     }
 }
 
-/// Iterator for a depth-first iteration over an unsorted arena
+/// Iterator for a depth-first iteration over a tree that implements [super::DirectionIterable].
 pub struct DepthFirstIterator<'a, 'b, T, N>
 where
     'a: 'b,
@@ -198,13 +209,13 @@ mod tests {
         assert_eq!(tree.nodes[2].children, &[ArenaIndex(6)]);
         assert_eq!(tree.nodes[3].children, &[ArenaIndex(5)]);
 
-        // // Example of how to print the hierachy
+        // // Example of how to print the hierarchy
         // tree.nodes
         // .iter()
         // .enumerate()
         // .for_each(|(i, n)| println!("{i}.: id: {}, load: {}, children {:?}", n.id, n.load, n.children));
 
-        // Optimize the tree such that the nodes are sorted in depth-frist manner
+        // Optimize the tree such that the nodes are sorted in depth-first manner
         let tree: DepthFirstArenaTree<usize, String> = tree.into();
 
         // Check correctness of child references for two nodes

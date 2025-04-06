@@ -15,21 +15,31 @@ description = "Direkt and inverse kinematics for biomechanics, robotics and char
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-faer = { version = "0.19.4", optional = true }
-itertools = "0.13.0"
+faer = { version = "0.21.7", optional = true }
+itertools = "0.14.0"
 nalgebra = { version = "0.33.2", optional = true }
 ndarray = { version = "0.16.1", optional = true, features = ["approx", "rayon"] }
+ndarray-linalg = { version = "0.17", optional = true }
+num-traits = "0.2.19"
 rayon = { version = "1.10.0", optional = true }
-thiserror = "2.0.7"
+thiserror = "2.0.12"
 tracing = "0.1.41"
 tracing-attributes = "0.1.28"
 
 [features]
-ndarray = ["dep:ndarray"]
+ndarray = ["dep:ndarray", "dep:ndarray-linalg"]
 faer = ["dep:faer"]
 nalgebra = ["dep:nalgebra"]
 rayon = ["dep:rayon"]
 
 [dev-dependencies]
-test-log = { version = "0.2.16", features = ["trace"] }
 approx = "0.5"
+mannequin = { path = ".", default-features = false, features = ["ndarray"] }
+
+# openblas is keg-only, which means it was not symlinked into /usr/local,
+# because macOS provides BLAS in Accelerate.framework.
+# For compilers to find openblas you may need to set:
+#  export LDFLAGS="-L/usr/local/opt/openblas/lib"
+#  export CPPFLAGS="-I/usr/local/opt/openblas/include"
+ndarray-linalg = { version = "0.17", features = ["openblas-system"] }
+test-log = { version = "0.2.17", features = ["trace"] }
