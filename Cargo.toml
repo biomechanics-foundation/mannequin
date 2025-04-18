@@ -41,5 +41,5 @@ mannequin = { path = ".", default-features = false, features = ["ndarray"] }
 # For compilers to find openblas you may need to set:
 #  export LDFLAGS="-L/usr/local/opt/openblas/lib"
 #  export CPPFLAGS="-I/usr/local/opt/openblas/include"
-ndarray-linalg = { version = "0.17", features = ["openblas-system"] }
+ndarray-linalg = { version = "0.17", features = ["openblas-static"] }
 test-log = { version = "0.2.17", features = ["trace"] }

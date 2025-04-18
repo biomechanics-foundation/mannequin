@@ -33,7 +33,7 @@ pub trait Differentiable<F: Float> {
     // where
     //     Self: 'a; // https://github.com/rust-lang/rust/issues/87479
 
-    /// returns a reference to the internal data type . Call [Differentiable::compute] first.
+    /// returns a reference to the internal data type . Call [Differentiable::compute] first. Column-major!
     fn jacobian(&self) -> &[F];
     /// Result of the forward kinematics stored in a flat `Vec` to be used in a gradient decent.
     /// Call [Differentiable::compute] first.
@@ -66,7 +66,34 @@ pub trait Differentiable<F: Float> {
     /// get active joints (those that correspond to columns in the jacobian).
     /// Call [Differentiable::setup] first.
     fn active(&self) -> &[bool];
+
+
 }
+
+
+/// Helper trait that is implemented for all iterators. Is used
+/// to filter a sequence by the output of [Differentiable::active].
+///
+/// Example:
+///
+/// ```rs
+/// current_angles
+///    .iter_mut() // iterate over all to update
+///    .filter_active(self.differentiable.active()) // modify only active joints
+///    .zip(&result) // get updates and update
+///    .for_each(|(angle, update)| { *angle += update });
+/// ```
+pub trait Filterable<T> {
+    fn filter_active(self, active: &[bool]) -> impl Iterator<Item=T>;
+}
+
+impl<T, I> Filterable<T> for I where I: Iterator<Item = T> {
+    fn filter_active(self, active: &[bool]) -> impl Iterator<Item=T> {
+        self.zip(active.iter()).filter_map(|(a,b)| if *b { Some(a)} else {None})
+    }
+}
+
+
 // Note: Won't make the trait itself generic. That would be cleaner but mean more overhead
 // (i.e., requiring full qualifiers in compositions)
 
@@ -185,7 +212,7 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         R: Rigid<FloatType = F>,
         I: Eq + Clone + Hash + Debug,
     {
-        debug_assert_eq!(params.len(), tree.len());
+        debug_assert_eq!(params.len(), self.selected_joints.len());
 
         // compute transformations only once
         let nodes_trafos = tree
@@ -206,6 +233,7 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
         if matches!(selection, ComputeSelection::JacobianOnly | ComputeSelection::All) {
             self.matrix
                 // .iter_mut()
+                // FIXME: Row below can panic .. handle errors
                 .chunks_mut(self.rows)
                 // TODO use rayon
                 .zip(

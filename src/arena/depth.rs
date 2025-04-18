@@ -14,6 +14,12 @@ use std::{fmt::Debug, hash::Hash};
 /// "Extends" [DirectedArenaTree] by composition.
 pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>);
 
+impl<Load, NodeId> DepthFirstArenaTree<Load, NodeId> {
+    pub fn new() -> Self{
+        DepthFirstArenaTree(DirectedArenaTree::new())
+    }
+}
+
 impl<Load, NodeId> From<DirectedArenaTree<Load, NodeId>> for DepthFirstArenaTree<Load, NodeId>
 where
     Load: 'static + Debug + PartialEq,

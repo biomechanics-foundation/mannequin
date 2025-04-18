@@ -8,6 +8,7 @@ use std::{fmt::Debug, hash::Hash};
 pub trait NodeLike<Load, NodeId> {
     fn is_leaf(&self) -> bool;
     fn get(&self) -> &Load;
+    fn get_mut(&mut self) -> &mut Load;
 
     fn id(&self) -> &NodeId;
     /// Get the node's distance to its root node. Required for computing accumulations.

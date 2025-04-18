@@ -5,7 +5,7 @@ use std::{fmt::Debug, iter::Sum};
 use itertools::{izip, Itertools};
 use num_traits::Float;
 
-use crate::{differentiable::ComputeSelection, DepthFirstIterable, Differentiable, Rigid};
+use crate::{differentiable::{ComputeSelection, Filterable}, DepthFirstIterable, Differentiable, Rigid};
 
 /// Trait representing a stateful forward kinematics algorithm.
 ///
@@ -97,6 +97,7 @@ where
         self.differential_model.setup(tree, selected_joints, selected_effectors);
     }
 
+    // TODO Think about turning this into an iterator ...
     fn solve(&mut self, tree: &IT, params: &mut [F], targets: &[F]) -> Self::Info {
         let mut counter = 0;
         let mut error: F;
@@ -127,10 +128,10 @@ where
 
             // dbg!(&result);
             // dbg!(&params);
-            izip!(params.iter_mut(), self.differential_model.active().iter())
-                .filter(|(_, a)| **a)
-                .zip(result.iter())
-                .for_each(|((p, _), r)| *p = *p + *r);
+
+
+            params.iter_mut().filter_active(self.differential_model.active()).zip(&result)
+                .for_each(|(p, r)| *p = *p + *r);
 
             if error < self.min_error {
                 break;
@@ -185,7 +186,7 @@ mod test {
 
         // let mut ik = DifferentialInverseModel::new(42, 10, 0.01, DifferentiableModel::new());
         let n_iterations = 13;
-        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 1.0);
+        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 0.6);
 
         ik.setup(
             &tree,
@@ -205,9 +206,11 @@ mod test {
 
         let result = ik.solve(&tree, &mut param, &effectors);
 
-        assert_eq!(result.iteration_count, n_iterations);
+        assert!(result.iteration_count <= n_iterations);
+        assert!(result.squared_error < 1e-2);
         dbg!(param);
         dbg!(result);
+        // assert_abs_diff_eq!(result.er, target, epsilon = 1e-6);
         // assert!(x.abs_diff_eq(&array![1., -2., -2.], 1e-9));
         // assert_abs_diff_eq!(result, target, epsilon = 1e-6);
     }

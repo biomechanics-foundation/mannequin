@@ -81,6 +81,10 @@ where
     fn id(&self) -> &NodeRef {
         &self.id //.clone()
     }
+
+    fn get_mut(&mut self) -> &mut Load {
+        &mut self.load
+    }
 }
 
 impl<Load, NodeRef> fmt::Display for ArenaNode<Load, NodeRef>
