@@ -19,8 +19,7 @@ pub trait Rigid: PartialEq {
     type Transformation: Clone + Debug;
     /// Vec, \[f64;4\], ...
     type Point;
-    // /// typically joint positions (angles/extension), f64, \[f64,3\]
-    // type Parameter;
+
     type FloatType: Float;
 
     // TODO Explain why this is defined on Rigid (the node) and not Mannequin (the tree) .. in short: otherwise this would be another generic and mannequin.rs would be unreadable because of trait bounds. This way it is quite elegant
@@ -80,6 +79,13 @@ pub trait Rigid: PartialEq {
     fn concat(first: &Self::Transformation, second: &Self::Transformation) -> Self::Transformation;
 
     /// Solve system of linear equations, and *update* (additive) the parameters.
+    ///
+    /// If the feature `faer` is enabled, a pure-rust implementation is
+    /// provided [faer::solve_linear] that can be called by the implementer.
+    /// However, if the number of dependencies is to be reduced and/or
+    /// [Blas/Lapack]() is available on the system. Note that adding a
+    /// default implementation based on faer would have introduced too much
+    /// additional code complexity.
     fn solve_linear(
         matrix: &[Self::FloatType],
         rows: usize,

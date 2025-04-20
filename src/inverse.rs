@@ -5,7 +5,10 @@ use std::{fmt::Debug, iter::Sum};
 use itertools::{izip, Itertools};
 use num_traits::Float;
 
-use crate::{differentiable::{ComputeSelection, Filterable}, DepthFirstIterable, Differentiable, Rigid};
+use crate::{
+    differentiable::{ComputeSelection, Filterable},
+    DepthFirstIterable, Differentiable, Rigid,
+};
 
 /// Trait representing a stateful forward kinematics algorithm.
 ///
@@ -103,6 +106,7 @@ where
         let mut error: F;
         let mut result = vec![F::zero(); self.differential_model.active().iter().filter(|i| **i).count()];
         loop {
+            dbg!(counter);
             self.differential_model.compute(tree, params, ComputeSelection::All);
             // dbg!(&params);
             dbg!(self.differential_model.flat_effectors());
@@ -129,8 +133,10 @@ where
             // dbg!(&result);
             // dbg!(&params);
 
-
-            params.iter_mut().filter_active(self.differential_model.active()).zip(&result)
+            params
+                .iter_mut()
+                .filter_active(self.differential_model.active())
+                .zip(&result)
                 .for_each(|(p, r)| *p = *p + *r);
 
             if error < self.min_error {
@@ -154,12 +160,12 @@ mod test {
     // The `ndarray` as a reference implementation is used for testing
 
     use super::*;
-    use crate::arena::iterables::{BaseDirectionIterable, OptimizedDirectionIterable};
+    use crate::arena::iterables::OptimizedDirectionIterable;
     use crate::ndarray::robot::{Axis, LinkNodeId, Segment};
     use crate::{DepthFirstArenaTree, DifferentiableModel, DirectedArenaTree, DirectionIterable};
-    use approx::assert_abs_diff_eq;
     use ndarray::prelude::*;
 
+    #[cfg(feature = "ndarray")]
     #[test]
     fn test_ik() {
         let mut tree = DirectedArenaTree::<Segment, LinkNodeId>::new();
@@ -186,7 +192,7 @@ mod test {
 
         // let mut ik = DifferentialInverseModel::new(42, 10, 0.01, DifferentiableModel::new());
         let n_iterations = 13;
-        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 0.6);
+        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 1.0);
 
         ik.setup(
             &tree,

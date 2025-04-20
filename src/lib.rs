@@ -38,5 +38,7 @@ pub use forward::{Forward, ForwardModel};
 pub use inverse::{DifferentialInverseModel, Inverse};
 pub use mannequin::{Mannequin, Rigid};
 // Backends
+#[cfg(feature = "faer")]
+pub mod faer;
 #[cfg(feature = "ndarray")]
 pub mod ndarray;

@@ -165,6 +165,7 @@ impl Rigid for Segment {
         }
     }
 
+    #[cfg(not(feature = "faer"))]
     fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], parameters: &mut [f64]) {
         let matrix = ArrayView1::from(matrix)
             .into_shape_with_order(((rows, cols), Order::ColumnMajor))
@@ -172,6 +173,15 @@ impl Rigid for Segment {
         let vector = ArrayView1::from(vector);
         let parameters = ArrayViewMut1::from(parameters);
         solve_linear(matrix, vector, parameters);
+    }
+
+    #[cfg(feature = "faer")]
+    fn solve_linear(matrix: &[f64], rows: usize, cols: usize, vector: &[f64], parameters: &mut [f64]) {
+        use std::f64::consts::PI;
+
+        use crate::faer::solve_linear;
+
+        solve_linear(matrix, rows, cols, vector, parameters, PI / 180.0 * 40.0);
     }
 }
 
