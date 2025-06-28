@@ -1,8 +1,8 @@
 //! Implementations for depth-first traversal, optimazatized trees and tree conversion.
 
 use super::{
-    iterables::OptimizedDirectionIterable, utils::sort_by_indices, ArenaIndex, ArenaNode, BaseDirectionIterable,
-    DepthFirstIterable, DirectedArenaTree, DirectionIterable,
+    ArenaIndex, ArenaNode, BaseDirectionIterable, DepthFirstIterable, DirectedArenaTree, DirectionIterable,
+    iterables::OptimizedDirectionIterable, utils::sort_by_indices,
 };
 use crate::MannequinError;
 use itertools::Itertools;
@@ -15,8 +15,14 @@ use std::{fmt::Debug, hash::Hash};
 pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>);
 
 impl<Load, NodeId> DepthFirstArenaTree<Load, NodeId> {
-    pub fn new() -> Self{
+    pub fn new() -> Self {
         DepthFirstArenaTree(DirectedArenaTree::new())
+    }
+}
+
+impl<Load, NodeId> Default for DepthFirstArenaTree<Load, NodeId> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
