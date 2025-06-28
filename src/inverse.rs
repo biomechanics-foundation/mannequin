@@ -2,12 +2,12 @@
 
 use std::{fmt::Debug, iter::Sum};
 
-use itertools::{izip, Itertools};
+use itertools::{Itertools, izip};
 use num_traits::Float;
 
 use crate::{
-    differentiable::{ComputeSelection, Filterable},
     DepthFirstIterable, Differentiable, Rigid,
+    differentiable::{ComputeSelection, Filterable},
 };
 
 /// Trait representing a stateful forward kinematics algorithm.
@@ -155,6 +155,7 @@ where
     }
 }
 
+#[cfg(feature = "ndarray")]
 #[cfg(test)]
 mod test {
     // The `ndarray` as a reference implementation is used for testing

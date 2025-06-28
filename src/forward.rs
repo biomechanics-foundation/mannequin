@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 
 use num_traits::Float;
 
-use crate::{differentiable::ComputeSelection, DepthFirstIterable, Differentiable, NodeLike, Rigid};
+use crate::{DepthFirstIterable, Differentiable, NodeLike, Rigid, differentiable::ComputeSelection};
 
 /// Trait representing a stateful forward kinematics algorithm. It allows selecting the effectors to be
 /// computed and thus a specific (or multiple) kinematic chain(s).
@@ -103,6 +103,7 @@ where
     }
 }
 
+#[cfg(feature = "ndarray")]
 #[cfg(test)]
 mod tests {
 

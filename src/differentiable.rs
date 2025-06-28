@@ -4,8 +4,8 @@
 //! The algorithms are independent of
 //! the numerical backend and support [f32] and [f64] floating point representations.
 
-use crate::{forward::TransformationAccumulation, DepthFirstIterable, NodeLike, Rigid};
-use itertools::{izip, Itertools};
+use crate::{DepthFirstIterable, NodeLike, Rigid, forward::TransformationAccumulation};
+use itertools::{Itertools, izip};
 use num_traits::Float;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -42,6 +42,10 @@ pub trait Differentiable<F: Float> {
     fn effectors(&self) -> Vec<&[F]>;
 
     /// Prepare algorithms for computation. This avoids memory allocation when calling [Differentiable::compute].
+    ///
+    /// Warning! The order of the IDs in `selected_joints` and `selected_effectors` does not matter (they are may be
+    /// converted into a [HashSet] immediately). The methods [Differentiable::effectors], [Differentiable::flat_effectors],
+    /// [Differentiable::jacobian], is determined only by the order of the nodes in the tree!
     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &[&I], selected_effectors: &[&I])
     where
         T: DepthFirstIterable<R, I>,
@@ -66,10 +70,7 @@ pub trait Differentiable<F: Float> {
     /// get active joints (those that correspond to columns in the jacobian).
     /// Call [Differentiable::setup] first.
     fn active(&self) -> &[bool];
-
-
 }
-
 
 /// Helper trait that is implemented for all iterators. Is used
 /// to filter a sequence by the output of [Differentiable::active].
@@ -84,15 +85,18 @@ pub trait Differentiable<F: Float> {
 ///    .for_each(|(angle, update)| { *angle += update });
 /// ```
 pub trait Filterable<T> {
-    fn filter_active(self, active: &[bool]) -> impl Iterator<Item=T>;
+    fn filter_active(self, active: &[bool]) -> impl Iterator<Item = T>;
 }
 
-impl<T, I> Filterable<T> for I where I: Iterator<Item = T> {
-    fn filter_active(self, active: &[bool]) -> impl Iterator<Item=T> {
-        self.zip(active.iter()).filter_map(|(a,b)| if *b { Some(a)} else {None})
+impl<T, I> Filterable<T> for I
+where
+    I: Iterator<Item = T>,
+{
+    fn filter_active(self, active: &[bool]) -> impl Iterator<Item = T> {
+        self.zip(active.iter())
+            .filter_map(|(a, b)| if *b { Some(a) } else { None })
     }
 }
-
 
 // Note: Won't make the trait itself generic. That would be cleaner but mean more overhead
 // (i.e., requiring full qualifiers in compositions)
@@ -234,6 +238,7 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
             self.matrix
                 // .iter_mut()
                 // FIXME: Row below can panic .. handle errors
+                // Column-major!
                 .chunks_mut(self.rows)
                 // TODO use rayon
                 .zip(
@@ -269,6 +274,7 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
     }
 }
 
+#[cfg(feature = "ndarray")]
 #[cfg(test)]
 mod tests {
 
@@ -278,7 +284,7 @@ mod tests {
     use crate::ndarray::robot::{Axis, LinkNodeId, Segment};
     use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable};
     use approx::assert_abs_diff_eq;
-    use ndarray::{prelude::*, Order};
+    use ndarray::{Order, prelude::*};
 
     #[test]
     fn test_jacobian() {

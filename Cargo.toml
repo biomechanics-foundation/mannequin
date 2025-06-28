@@ -1,13 +1,14 @@
 [package]
 name = "mannequin"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Stefan Ulbrich"]
 documentation = "https://github.com/biomechanics-foundation/mannequin"
-edition = "2021"
+edition = "2024"
 homepage = "https://github.com/biomechanics-foundation/mannequin"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/biomechanics-foundation/mannequin"
-rust-version = "1.67"
+rust-version = "1.85"
+# rust-version = "1.67"
 
 readme = "Readme.md"
 description = "Direkt and inverse kinematics for biomechanics, robotics and character animation"
@@ -15,8 +16,9 @@ description = "Direkt and inverse kinematics for biomechanics, robotics and char
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-faer = { version = "0.21.7", optional = true }
+faer = { version = "0.21.9", optional = true }
 faer-traits = { version = "0.21.5", optional = true }
+godot = { version = "0.2.4", optional = true }
 itertools = "0.14.0"
 nalgebra = { version = "0.33.2", optional = true }
 ndarray = { version = "0.16.1", optional = true, features = ["approx", "rayon"] }
@@ -32,10 +34,12 @@ ndarray = ["dep:ndarray", "dep:ndarray-linalg"]
 faer = ["dep:faer", "dep:faer-traits"]
 nalgebra = ["dep:nalgebra"]
 rayon = ["dep:rayon"]
+godot = ["dep:godot"]
 
 [dev-dependencies]
 approx = "0.5"
-mannequin = { path = ".", default-features = false, features = ["ndarray", "faer"] }
+# mannequin = { path = ".", default-features = false, features = ["ndarray", "faer"] }
+mannequin = { path = ".", default-features = false, features = ["faer"] }
 
 # openblas is keg-only, which means it was not symlinked into /usr/local,
 # because macOS provides BLAS in Accelerate.framework.
