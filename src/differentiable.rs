@@ -9,6 +9,7 @@ use itertools::{Itertools, izip};
 use num_traits::Float;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
 /// Computation shares common intermediate results. This enum
@@ -104,7 +105,7 @@ where
 /// Backend-agnostic implementation of algorithms for computing the forward kinematics
 /// and partial derivatives (i.e, Jacobian matrix) or the application in inverse kinematics
 /// solvers. Generic in the floating point representation.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct DifferentiableModel<F: Float> {
     matrix: Vec<F>,
     configuration: Vec<F>,
@@ -285,6 +286,7 @@ mod tests {
     use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable};
     use approx::assert_abs_diff_eq;
     use ndarray::{Order, prelude::*};
+    use serde_json;
 
     #[test]
     fn test_jacobian() {
@@ -341,6 +343,10 @@ mod tests {
             [0.0, 0.0, -10.0, -10.0],
             [0.0, 0.0, 0.0, 0.0,]
         ];
+
+        // TODO make a separate test for serialization
+        let serialized = serde_json::to_string(&jacobian).unwrap();
+        println!("Serialized: {serialized}");
 
         assert_eq!(jacobian.shape(), (6, 4));
         assert_abs_diff_eq!(result, target, epsilon = 1e-6);

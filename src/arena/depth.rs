@@ -6,21 +6,31 @@ use super::{
 };
 use crate::MannequinError;
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, hash::Hash};
 
 /// Data structure representing an arena tree in which the arena is sorted in depth-first
 /// order for faster access
 ///
 /// "Extends" [DirectedArenaTree] by composition.
-pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>);
+#[derive(Serialize, Deserialize)]
+pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>)
+where
+    NodeId: Eq + Hash;
 
-impl<Load, NodeId> DepthFirstArenaTree<Load, NodeId> {
+impl<Load, NodeId> DepthFirstArenaTree<Load, NodeId>
+where
+    NodeId: Eq + Hash,
+{
     pub fn new() -> Self {
         DepthFirstArenaTree(DirectedArenaTree::new())
     }
 }
 
-impl<Load, NodeId> Default for DepthFirstArenaTree<Load, NodeId> {
+impl<Load, NodeId> Default for DepthFirstArenaTree<Load, NodeId>
+where
+    NodeId: Eq + Hash,
+{
     fn default() -> Self {
         Self::new()
     }
@@ -113,6 +123,7 @@ pub struct DepthFirstIterator<'a, 'b, T, N>
 where
     'a: 'b,
     T: 'static + Debug + PartialEq,
+    N: Eq + Hash,
 {
     tree: &'a DirectedArenaTree<T, N>,
     stack: Vec<std::slice::Iter<'b, ArenaIndex>>,
@@ -122,6 +133,7 @@ where
 impl<'a, T, N> DepthFirstIterator<'a, '_, T, N>
 where
     T: 'static + Debug + PartialEq,
+    N: Eq + Hash,
 {
     pub fn new(tree: &'a DirectedArenaTree<T, N>, root: ArenaIndex) -> Self {
         let stack = Vec::with_capacity(tree.max_depth);
@@ -136,6 +148,7 @@ where
 impl<'a, T, N> Iterator for DepthFirstIterator<'a, '_, T, N>
 where
     T: Debug + PartialEq,
+    N: Eq + Hash,
 {
     type Item = &'a ArenaNode<T, N>;
 

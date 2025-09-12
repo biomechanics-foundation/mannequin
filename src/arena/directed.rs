@@ -11,17 +11,19 @@ use super::{BreadthFirstIterator, DepthFirstArenaTree, DepthFirstIterator};
 use crate::MannequinError;
 use core::fmt;
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
+// https://stackoverflow.com/a/42551386
 
 /// Position index in an arena memory allocation.
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct ArenaIndex(pub usize);
 
 /// The node datatype used throughout this crate and used in all implementers of
 /// the tree traits in [super::iterables].
 ///
 /// Some of the available Fields are used to speed up iteration.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ArenaNode<Load, NodeId> {
     /// The user-defined load that the node owns
     pub(super) load: Load,
@@ -108,7 +110,13 @@ where
 ///
 /// The tree is mutable, that is, adding nodes possible, unlike in
 /// the trees optimized for a single direction.
-pub struct DirectedArenaTree<Load, NodeID> {
+#[derive(Serialize, Deserialize)]
+pub struct DirectedArenaTree<Load, NodeID>
+where
+    NodeID: Eq + Hash,
+    // NOTE: This constraint is necessary to use the hashmap but not to define it. We need it for Deserialize. It does not hurt but it's viral and
+    // has to be added in a few places which is not really a problem (it's more explicit after all)
+{
     /// Memory allocated area for nodes
     pub(crate) nodes: Vec<ArenaNode<Load, NodeID>>,
 
@@ -119,7 +127,10 @@ pub struct DirectedArenaTree<Load, NodeID> {
     pub(super) lookup: HashMap<NodeID, ArenaIndex>,
 }
 
-impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
+impl<Load, NodeId> DirectedArenaTree<Load, NodeId>
+where
+    NodeId: Eq + Hash,
+{
     /// Constructor. Sorting indicates whether the elements are stored to
     /// make either deoth or breadth first traversal efficient (slow insertion). `None` indicates
     /// that the data will be unordered (fast insertion, slower traversal).
@@ -170,7 +181,10 @@ impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
     }
 }
 
-impl<Load, NodeId> Default for DirectedArenaTree<Load, NodeId> {
+impl<Load, NodeId> Default for DirectedArenaTree<Load, NodeId>
+where
+    NodeId: Eq + Hash,
+{
     fn default() -> Self {
         Self::new()
     }
