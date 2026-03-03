@@ -110,7 +110,7 @@ where
 ///
 /// The tree is mutable, that is, adding nodes possible, unlike in
 /// the trees optimized for a single direction.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DirectedArenaTree<Load, NodeID>
 where
     NodeID: Eq + Hash,

@@ -105,7 +105,7 @@ where
 /// Backend-agnostic implementation of algorithms for computing the forward kinematics
 /// and partial derivatives (i.e, Jacobian matrix) or the application in inverse kinematics
 /// solvers. Generic in the floating point representation.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct DifferentiableModel<F: Float> {
     matrix: Vec<F>,
     configuration: Vec<F>,
@@ -190,7 +190,7 @@ impl<F: Float> Differentiable<F> for DifferentiableModel<F> {
             .sum();
 
         self.cols = self.selected_joints.iter().filter(|&selected| *selected).count();
-        dbg!((&self.selected_joints, self.rows, self.cols));
+        // dbg!((&self.selected_joints, self.rows, self.cols));
 
         self.matrix.clear();
         self.matrix.resize(self.rows * self.cols, F::zero());

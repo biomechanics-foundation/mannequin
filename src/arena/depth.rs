@@ -13,7 +13,7 @@ use std::{fmt::Debug, hash::Hash};
 /// order for faster access
 ///
 /// "Extends" [DirectedArenaTree] by composition.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>)
 where
     NodeId: Eq + Hash;
