@@ -2,12 +2,12 @@
 
 use std::{fmt::Debug, iter::Sum};
 
-use itertools::{Itertools, izip};
+use itertools::{izip, Itertools};
 use num_traits::Float;
 
 use crate::{
-    DepthFirstIterable, Differentiable, Rigid,
     differentiable::{ComputeSelection, Filterable},
+    DepthFirstIterable, Differentiable, Rigid,
 };
 
 /// Trait representing a stateful forward kinematics algorithm.
@@ -112,7 +112,7 @@ where
             dbg!(self.differential_model.flat_effectors());
             // dbg!(self.differential_model.effectors());
             let mut diff = izip!(targets, self.differential_model.flat_effectors())
-                .map(|(x, y)| (*x - *y))
+                .map(|(x, y)| *x - *y)
                 .collect_vec();
 
             // dbg!(&self.differential_model.jacobian());

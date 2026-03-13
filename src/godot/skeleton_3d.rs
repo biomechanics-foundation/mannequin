@@ -6,7 +6,7 @@ use godot::prelude::*;
 /// Iterate over the bones of a [Skeleton3D] depth-first.
 pub trait BoneIteratable {
     /// Depth-first iteration over bones of a skeleton
-    fn iter_bones(&self) -> BoneIterator;
+    fn iter_bones(&self) -> BoneIterator<'_>;
 }
 
 /// Iterator over the bones of a [Skeleton3D] depth-first.
@@ -40,7 +40,7 @@ impl Iterator for BoneIterator<'_> {
 }
 
 impl BoneIteratable for Skeleton3D {
-    fn iter_bones(&self) -> BoneIterator {
+    fn iter_bones(&self) -> BoneIterator<'_> {
         let roots = self.get_parentless_bones().to_vec();
         BoneIterator {
             skeleton: self,

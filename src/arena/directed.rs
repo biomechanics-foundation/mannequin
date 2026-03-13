@@ -162,7 +162,7 @@ where
     /// Given an squenze of nodes (i.e., an areana), update the references to child nodes when
     /// the arena is reorderd. It takes a sequence of the same size with the new indices as a parameter
     pub(super) fn update_child_indices(nodes: &mut [ArenaNode<Load, NodeId>], indices: &[ArenaIndex]) {
-        nodes.iter_mut().for_each(|node| {
+        for node in nodes.iter_mut() {
             node.children.iter_mut().for_each(|child_ref| {
                 *child_ref = ArenaIndex(
                     indices
@@ -177,7 +177,7 @@ where
                     .position(|i| *i == node.index)
                     .expect("Internal error. Could not find index!"),
             );
-        });
+        }
     }
 }
 
