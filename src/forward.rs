@@ -5,88 +5,61 @@
 
 use std::marker::PhantomData;
 
-use num_traits::Float;
+use itertools::Itertools;
 
-use crate::{DepthFirstIterable, Differentiable, NodeLike, Rigid, differentiable::ComputeSelection};
+use crate::{DepthFirstIterable, NodeLike, Rigid};
+use std::{fmt::Debug, hash::Hash};
+/// TODO
+#[derive(Default)]
+struct Forwardconfig<'a, I>
+where
+    I: Eq + Clone + Hash + Debug,
+{
+    max_depth: usize,
+    selected_joints: Vec<&'a I>,
+    selected_effectors: vec<&'a I>,
+    // Selection of active joints and effectors
+}
 
 /// Trait representing a stateful forward kinematics algorithm. It allows selecting the effectors to be
 /// computed and thus a specific (or multiple) kinematic chain(s).
-pub trait Forward<IT, RB>
-where
-    IT: DepthFirstIterable<RB, RB::NodeId>,
-    RB: Rigid,
-{
-    fn setup(&mut self, tree: &IT, selected_effectors: &[&<RB as Rigid>::NodeId]);
-    fn solve(&mut self, tree: &IT, params: &[RB::FloatType]) -> Vec<&[RB::FloatType]>;
-}
-
-/// Default forward kinematics that is only a thin wrapper around an [Differentiable] instance.
-pub struct ForwardModel<F, D>
-where
-    F: Float,
-    D: Differentiable<F>,
-{
-    differential_model: D,
-    p: PhantomData<F>,
-}
-
-impl<F, D> ForwardModel<F, D>
-where
-    F: Float,
-    D: Differentiable<F>,
-{
-    pub fn new(differential_model: D) -> Self {
-        Self {
-            differential_model,
-            p: PhantomData,
-        }
-    }
-}
-
-impl<IT, RB, F, D> Forward<IT, RB> for ForwardModel<F, D>
-where
-    IT: DepthFirstIterable<RB, RB::NodeId>,
-    RB: Rigid<FloatType = F>,
-    F: Float,
-    D: Differentiable<F>,
-{
-    fn solve(&mut self, tree: &IT, params: &[<RB as Rigid>::FloatType]) -> Vec<&[F]> {
-        self.differential_model
-            .compute(tree, params, ComputeSelection::EffectorsOnly);
-        self.differential_model.effectors()
-    }
-
-    fn setup(&mut self, tree: &IT, selected_effectors: &[&<RB as Rigid>::NodeId]) {
-        self.differential_model.setup(tree, &[], selected_effectors);
-    }
-}
-
-/// Trait that adds an `accumulate` functions for accumulating transformations from direct path from a root to a node.
-/// Implemented for an iterator over nodes but should only be used on a depth-first iteration (not enforced!)
-pub trait TransformationAccumulation<'a, Node, Load, NodeRef>
+pub trait Forward<'a, Node, Load, NodeRef, Tree, NodeId>
 where
     Load: Rigid,
     Node: NodeLike<Load, NodeRef> + 'a,
+    NodeId: Eq + Clone + Hash + Debug,
+    Tree: DepthFirstIterable<Load, NodeId, Node = Node>,
 {
     fn accumulate(
-        self,
+        &'a self,
         params: &[Load::FloatType],
         max_depth: usize,
     ) -> impl Iterator<Item = (&'a Node, Load::Transformation)>;
+
+    fn forward<'b>(
+        &'a self,
+        params: &[Load::FloatType],
+        config: &'b Forwardconfig<'a, NodeId>,
+    ) -> ForwardModel<'a, 'b, Node, Load, NodeRef, Tree, NodeId>;
+    // fn setup(&mut self, tree: &IT, selected_effectors: &[&<RB as Rigid>::NodeId]);
+    // fn solve(&mut self, tree: &IT, params: &[RB::FloatType]) -> Vec<&[RB::FloatType]>;
 }
 
-impl<'a, Node, Load, NodeRef, T> TransformationAccumulation<'a, Node, Load, NodeRef> for T
+impl<'a, Node, Load, NodeRef, NodeId, Tree> Forward<'a, Node, Load, NodeRef, Tree, NodeId> for Tree
 where
     Node: NodeLike<Load, NodeRef> + 'a,
     Load: Rigid,
-    T: Iterator<Item = &'a Node>,
+    // FIXME: Implement on DepthFirst
+    // T: Iterator<Item = &'a Node>,
+    NodeId: Eq + Clone + Hash + Debug,
+    Tree: DepthFirstIterable<Load, NodeId, Node = Node>,
 {
     fn accumulate(
-        self,
+        &'a self,
         params: &[Load::FloatType],
         max_depth: usize,
     ) -> impl Iterator<Item = (&'a Node, <Load as Rigid>::Transformation)> {
-        self.into_iter().enumerate().scan(
+        self.iter().enumerate().scan(
             Vec::<Load::Transformation>::with_capacity(max_depth),
             |stack, (index, node)| {
                 while node.depth() < stack.len() {
@@ -101,7 +74,150 @@ where
             },
         )
     }
+
+    fn forward<'b>(
+        &'a self,
+        params: &[Load::FloatType],
+        config: &'b Forwardconfig<'a, NodeId>,
+    ) -> ForwardModel<'a, 'b, Node, Load, NodeRef, Tree, NodeId> {
+        let transformations = self.accumulate(params, config.max_depth).collect_vec();
+        ForwardModel {
+            transformations,
+            tree: self,
+            config,
+            _noderef: PhantomData,
+            _nodeid: PhantomData,
+        }
+    }
 }
+
+/// Default forward kinematics that is only a thin wrapper around an [Differentiable] instance.
+pub struct ForwardModel<'a, 'b, Node, Load, Noderef, Tree, NodeId>
+where
+    Node: NodeLike<Load, Noderef> + 'a,
+    Load: Rigid,
+    Tree: DepthFirstIterable<Load, NodeId>,
+    NodeId: Eq + Clone + Hash + Debug,
+{
+    transformations: Vec<(&'a Node, Load::Transformation)>,
+    tree: &'a Tree,
+    config: &'b Forwardconfig<'a, NodeId>,
+    _noderef: PhantomData<Noderef>,
+    _nodeid: PhantomData<NodeId>,
+}
+
+impl<'a, 'b, Node, Load, Noderef, Tree, NodeId> ForwardModel<'a, 'b, Node, Load, Noderef, Tree, NodeId>
+where
+    Node: NodeLike<Load, Noderef> + 'a,
+    Load: Rigid,
+    Tree: DepthFirstIterable<Load, NodeId>,
+    NodeId: Eq + Clone + Hash + Debug,
+{
+    fn effectors(&self) -> Vec<&[Load::FloatType]> {
+        todo!()
+    }
+    fn flat_effectors(&self) -> &[Load::FloatType] {
+        todo!()
+    }
+}
+
+// impl<F, D> ForwardModel<F, D>
+// where
+//     F: Float,
+//     D: Differentiable<F>,
+// {
+//     pub fn new(differential_model: D) -> Self {
+//         Self {
+//             differential_model,
+//             p: PhantomData,
+//         }
+//     }
+// }
+
+// impl<IT, RB, F, D> Forward<IT, RB> for ForwardModel<F, D>
+// where
+//     IT: DepthFirstIterable<RB, RB::NodeId>,
+//     RB: Rigid<FloatType = F>,
+//     F: Float,
+//     D: Differentiable<F>,
+// {
+//     fn accumulate(
+//         self,
+//         params: &[Load::FloatType],
+//         max_depth: usize,
+//     ) -> impl Iterator<Item = (&'a Node, <Load as Rigid>::Transformation)> {
+//         self.into_iter().enumerate().scan(
+//             Vec::<Load::Transformation>::with_capacity(max_depth),
+//             |stack, (index, node)| {
+//                 while node.depth() < stack.len() {
+//                     stack.pop();
+//                 }
+//                 let current = Load::concat(
+//                     stack.last().unwrap_or(&Load::neutral_element()),
+//                     &node.get().transform(params, index),
+//                 );
+//                 stack.push(current.clone());
+//                 Some((node, current))
+//             },
+//         )
+//     }
+
+//     fn forward() -> ForwardModel {
+//         todo!()
+//     }
+
+//     // fn solve(&mut self, tree: &IT, params: &[<RB as Rigid>::FloatType]) -> Vec<&[F]> {
+//     //     self.differential_model
+//     //         .compute(tree, params, ComputeSelection::EffectorsOnly);
+//     //     self.differential_model.effectors()
+//     // }
+
+//     // fn setup(&mut self, tree: &IT, selected_effectors: &[&<RB as Rigid>::NodeId]) {
+//     //     self.differential_model.setup(tree, &[], selected_effectors);
+//     // }
+// }
+
+// /// Trait that adds an `accumulate` functions for accumulating transformations from direct path from a root to a node.
+// /// Implemented for an iterator over nodes but should only be used on a depth-first iteration (not enforced!)
+// pub trait TransformationAccumulation<'a, Node, Load, NodeRef>
+// where
+//     Load: Rigid,
+//     Node: NodeLike<Load, NodeRef> + 'a,
+// {
+//     // fn accumulate(
+//     //     self,
+//     //     params: &[Load::FloatType],
+//     //     max_depth: usize,
+//     // ) -> impl Iterator<Item = (&'a Node, Load::Transformation)>;
+// }
+
+// impl<'a, Node, Load, NodeRef, T> TransformationAccumulation<'a, Node, Load, NodeRef> for T
+// where
+//     Node: NodeLike<Load, NodeRef> + 'a,
+//     Load: Rigid,
+//     T: Iterator<Item = &'a Node>,
+// {
+//     // fn accumulate(
+//     //     self,
+//     //     params: &[Load::FloatType],
+//     //     max_depth: usize,
+//     // ) -> impl Iterator<Item = (&'a Node, <Load as Rigid>::Transformation)> {
+//     //     self.into_iter().enumerate().scan(
+//     //         Vec::<Load::Transformation>::with_capacity(max_depth),
+//     //         |stack, (index, node)| {
+//     //             while node.depth() < stack.len() {
+//     //                 stack.pop();
+//     //             }
+//     //             let current = Load::concat(
+//     //                 stack.last().unwrap_or(&Load::neutral_element()),
+//     //                 &node.get().transform(params, index),
+//     //             );
+//     //             stack.push(current.clone());
+//     //             Some((node, current))
+//     //         },
+//     //     )
+//     // }
+// }
 
 #[cfg(feature = "ndarray")]
 #[cfg(test)]
