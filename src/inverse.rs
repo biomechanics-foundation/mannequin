@@ -1,40 +1,197 @@
 //! Interface and basic implementor for the inverse kinematic model.
 
-use std::{fmt::Debug, iter::Sum};
+use std::{fmt::Debug, hash::Hash, iter::Sum};
 
-use itertools::{Itertools, izip};
+use itertools::{izip, Itertools};
 use num_traits::Float;
 
 use crate::{
-    DepthFirstIterable, Differentiable, Rigid,
-    differentiable::{ComputeSelection, Filterable},
+    differentiable::Filterable, forward::Forward, Articulated, DepthFirstIterable, Differentiable, NodeLike, Rigid,
 };
 
-/// Trait representing a stateful forward kinematics algorithm.
+pub trait Invertable<NodeType, LoadType, TreeType, IdType>: Articulated<NodeType, LoadType, TreeType, IdType>
+where
+    LoadType: Rigid,
+    NodeType: NodeLike<LoadType, IdType>,
+    IdType: Eq + Clone + Hash + Debug,
+{
+    type Config;
+    type Model<'x, 'y, 'z>: Inverse<LoadType::FloatType>
+    where
+        Self: 'x;
+
+    fn inverse<'a, 'b, 'c>(
+        &'a self,
+        forward_config: &'b <Self as Articulated<NodeType, LoadType, TreeType, IdType>>::Config,
+        inverse_config: &'c <Self as Invertable<NodeType, LoadType, TreeType, IdType>>::Config,
+    ) -> <Self as Invertable<NodeType, LoadType, TreeType, IdType>>::Model<'a, 'b, 'c>;
+}
+
+impl<NodeType, LoadType, TreeType, IdType, FloatType> Invertable<NodeType, LoadType, TreeType, IdType> for TreeType
+where
+    LoadType: Rigid<FloatType = FloatType>,
+    FloatType: Float + Sum + Debug + 'static,
+    NodeType: NodeLike<LoadType, IdType>,
+    IdType: Eq + Clone + Hash + Debug,
+    TreeType: DepthFirstIterable<LoadType, IdType, Node = NodeType>,
+{
+    type Config = InverseConfig<LoadType::FloatType>;
+
+    type Model<'x, 'y, 'z>
+        = DifferentialIK<'x, 'y, 'z, NodeType, LoadType, TreeType, IdType>
+    where
+        Self: 'x;
+
+    fn inverse<'a, 'b, 'c>(
+        &'a self,
+        forward_config: &'b <Self as Articulated<NodeType, LoadType, TreeType, IdType>>::Config,
+        inverse_config: &'c <Self as Invertable<NodeType, LoadType, TreeType, IdType>>::Config,
+    ) -> <Self as Invertable<NodeType, LoadType, TreeType, IdType>>::Model<'a, 'b, 'c> {
+        DifferentialIK {
+            tree: self,
+            forward_config,
+            inverse_config,
+        }
+    }
+}
+
+pub struct InverseConfig<F: Float> {
+    inital: Vec<F>,
+
+    max_iterations_count: usize,
+    scale_difference: F,
+    min_error: F,
+}
+
+pub struct DifferentialIK<'a, 'b, 'c, NodeType, LoadType, TreeType, IdType>
+where
+    LoadType: Rigid,
+    NodeType: NodeLike<LoadType, IdType>,
+    TreeType: DepthFirstIterable<LoadType, IdType, Node = NodeType>,
+    IdType: Eq + Clone + Hash + Debug,
+{
+    pub tree: &'a TreeType,
+    pub forward_config: &'b <TreeType as Articulated<NodeType, LoadType, TreeType, IdType>>::Config,
+    pub inverse_config: &'c InverseConfig<LoadType::FloatType>,
+}
+
+pub trait Inverse<F> {
+    type Info;
+
+    fn solve(&self, targets: &[F]) -> (Vec<F>, Self::Info);
+}
+
+pub struct DifferentialIKResult<F>
+where
+    F: Float + Debug + Sum,
+{
+    pub iteration_count: usize,
+    pub squared_error: F,
+}
+
+impl<'a, 'b, 'c, NodeType, LoadType, TreeType, IdType, FloatType> Inverse<FloatType>
+    for DifferentialIK<'a, 'b, 'c, NodeType, LoadType, TreeType, IdType>
+where
+    LoadType: Rigid<FloatType = FloatType>,
+    FloatType: Float + Debug + Sum,
+    NodeType: NodeLike<LoadType, IdType>,
+    TreeType: 'a + DepthFirstIterable<LoadType, IdType, Node = NodeType>,
+    IdType: Eq + Clone + Hash + Debug,
+{
+    type Info = DifferentialIKResult<FloatType>;
+
+    fn solve(&self, targets: &[FloatType]) -> (Vec<FloatType>, Self::Info) {
+        let mut counter = 0;
+        let mut error: FloatType;
+        let mut result = vec![FloatType::zero(); self.forward_config.rows]; // .differential_model.active().iter().filter(|i| **i).count()];
+
+        let mut params = self.inverse_config.inital.clone();
+
+        loop {
+            dbg!(counter);
+
+            let forward = self.tree.pose(&params, self.forward_config);
+            // dbg!(&params);
+            //
+            let effectors = forward.flat_effectors();
+            dbg!(forward.flat_effectors());
+            // dbg!(self.differential_model.effectors());
+            let mut diff = izip!(targets, effectors).map(|(x, y)| (*x - y)).collect_vec();
+
+            // dbg!(&self.differential_model.jacobian());
+            error = diff.iter().map(|x| *x * *x).sum();
+            dbg!(&error);
+            // dbg!(&diff);
+
+            diff.iter_mut()
+                .for_each(|x| *x = *x * self.inverse_config.scale_difference);
+
+            LoadType::solve_linear(
+                &forward.jacobian(),
+                self.forward_config.rows,
+                self.forward_config.cols,
+                &diff,
+                &mut result,
+            );
+
+            // dbg!(&result);
+            // dbg!(&params);
+
+            params
+                .iter_mut()
+                .filter_active(&self.forward_config.selected_joints)
+                .zip(&result)
+                .for_each(|(p, r)| *p = *p + *r);
+
+            if error < self.inverse_config.min_error {
+                break;
+            }
+            counter += 1;
+            if counter >= self.inverse_config.max_iterations_count {
+                break;
+            }
+        }
+
+        (
+            params,
+            Self::Info {
+                iteration_count: counter,
+                squared_error: error,
+            },
+        )
+    }
+}
+
+/* /// Trait representing a stateful inverse kinematics algorithm.
 ///
 /// It allows selecting the effectors to be computed and thus a specific (or multiple) kinematic chain(s), and
 /// which joints are active (can be moved).
-pub trait Inverse<IT, RB>
+pub trait Inverse<TreeType, LoadType>
 where
-    IT: DepthFirstIterable<RB, RB::NodeId>,
-    RB: Rigid,
+    TreeType: DepthFirstIterable<LoadType, LoadType::NodeId>,
+    LoadType: Rigid,
 {
     /// The return type com [Inverse::solve] that carries information about the outcome
     type Info;
 
     /// Preparation the computation (memory allocation, and joint/effector selection).
-    fn setup(&mut self, tree: &IT, selected_joints: &[&<RB as Rigid>::NodeId], selected_effectors: &[&RB::NodeId]);
+    fn setup(
+        &mut self,
+        tree: &TreeType,
+        selected_joints: &[&<LoadType as Rigid>::NodeId],
+        selected_effectors: &[&LoadType::NodeId],
+    );
 
     /// Compute the inverse kinematics
     fn solve(
         &mut self,
-        tree: &IT,
-        param: &mut [<RB as Rigid>::FloatType],
-        targets: &[<RB as Rigid>::FloatType],
+        tree: &TreeType,
+        param: &mut [<LoadType as Rigid>::FloatType],
+        targets: &[<LoadType as Rigid>::FloatType],
     ) -> Self::Info;
 }
 
-/// Information about the solution for the dfault, differential IK solver
+/// Information about the solution for the default, differential IK solver
 #[derive(Debug, Clone)]
 pub struct DiffIKInfo<F: Float> {
     /// Number of required iterations (indicates convergence)
@@ -48,29 +205,29 @@ pub struct DiffIKInfo<F: Float> {
 /// It delegates linear algebra operations (solving the system of linear equations) to
 /// backend-specific implementers of [crate::Rigid], and uses a backend-agnostic
 /// [Differentiable] for computing the Jacobian matrix.
-pub struct DifferentialInverseModel<F, D>
+pub struct DifferentialInverseModel<FloatType, TreeType>
 where
-    F: Float,
-    D: Differentiable<F>,
+    FloatType: Float,
+    TreeType: Differentiable<FloatType>,
 {
     _max_depth: usize,
     max_iterations_count: usize,
-    min_error: F,
-    differential_model: D,
-    scale_difference: F,
+    min_error: FloatType,
+    differential_model: TreeType,
+    scale_difference: FloatType,
 }
 
-impl<F, D> DifferentialInverseModel<F, D>
+impl<FloatType, DifferentiableType> DifferentialInverseModel<FloatType, DifferentiableType>
 where
-    F: Float,
-    D: Differentiable<F>,
+    FloatType: Float,
+    DifferentiableType: Differentiable<FloatType>,
 {
     pub fn new(
         _max_depth: usize,
         max_iterations_count: usize,
-        min_error: F,
-        differential_model: D,
-        scale_difference: F,
+        min_error: FloatType,
+        differential_model: DifferentiableType,
+        scale_difference: FloatType,
     ) -> Self {
         Self {
             _max_depth,
@@ -153,7 +310,7 @@ where
             squared_error: error,
         }
     }
-}
+} */
 
 #[cfg(feature = "ndarray")]
 #[cfg(test)]

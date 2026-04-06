@@ -14,18 +14,18 @@ use std::{fmt::Debug, hash::Hash};
 /// "Extends" [DirectedArenaTree] by composition.
 pub struct DepthFirstArenaTree<Load, NodeId>(DirectedArenaTree<Load, NodeId>);
 
-impl<Load, NodeId> DepthFirstArenaTree<Load, NodeId> {
-    pub fn new() -> Self{
+impl<LoadType, IdType> DepthFirstArenaTree<LoadType, IdType> {
+    pub fn new() -> Self {
         DepthFirstArenaTree(DirectedArenaTree::new())
     }
 }
 
-impl<Load, NodeId> From<DirectedArenaTree<Load, NodeId>> for DepthFirstArenaTree<Load, NodeId>
+impl<LoadType, IdType> From<DirectedArenaTree<LoadType, IdType>> for DepthFirstArenaTree<LoadType, IdType>
 where
-    Load: 'static + Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
+    LoadType: 'static + Debug + PartialEq,
+    IdType: Eq + 'static + Clone + Hash + Debug,
 {
-    fn from(mut value: DirectedArenaTree<Load, NodeId>) -> Self {
+    fn from(mut value: DirectedArenaTree<LoadType, IdType>) -> Self {
         // sorts the order of nodes such that depth-first decent is optimal
 
         let optimal_order = value.iter_depth().map(|node| node.index).collect_vec();
@@ -40,26 +40,26 @@ where
     }
 }
 
-impl<Load, NodeId> BaseDirectionIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
+impl<LoadType, IdType> BaseDirectionIterable<LoadType, IdType> for DepthFirstArenaTree<LoadType, IdType>
 where
-    Load: 'static + Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
+    LoadType: 'static + Debug + PartialEq,
+    IdType: Eq + 'static + Clone + Hash + Debug,
 {
-    type Node = ArenaNode<Load, NodeId>;
+    type Node = ArenaNode<LoadType, IdType>;
 
-    fn root(&self) -> Result<&Self::Node, MannequinError<NodeId>> {
+    fn root(&self) -> Result<&Self::Node, MannequinError<IdType>> {
         self.0.root()
     }
 
-    fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>> {
+    fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<IdType>> {
         self.0.children(node)
     }
 
-    fn node_by_load(&self, load: &Load) -> Option<&Self::Node> {
+    fn node_by_load(&self, load: &LoadType) -> Option<&Self::Node> {
         self.0.node_by_load(load)
     }
 
-    fn node_by_id(&self, node_id: &NodeId) -> Option<&Self::Node> {
+    fn node_by_id(&self, node_id: &IdType) -> Option<&Self::Node> {
         self.0.node_by_id(node_id)
     }
 
@@ -72,10 +72,10 @@ where
     }
 }
 
-impl<Load, NodeId> OptimizedDirectionIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
+impl<LoadType, IdType> OptimizedDirectionIterable<LoadType, IdType> for DepthFirstArenaTree<LoadType, IdType>
 where
-    Load: 'static + Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
+    LoadType: 'static + Debug + PartialEq,
+    IdType: Eq + 'static + Clone + Hash + Debug,
 {
     fn iter(&self) -> impl Iterator<Item = &Self::Node> {
         self.0.nodes.iter()
@@ -86,10 +86,10 @@ where
     }
 }
 
-impl<Load, NodeId> DepthFirstIterable<Load, NodeId> for DepthFirstArenaTree<Load, NodeId>
+impl<LoadType, IdType> DepthFirstIterable<LoadType, IdType> for DepthFirstArenaTree<LoadType, IdType>
 where
-    Load: 'static + Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
+    LoadType: 'static + Debug + PartialEq,
+    IdType: Eq + 'static + Clone + Hash + Debug,
 {
     fn iter_sub(&self, root: &Self::Node) -> impl Iterator<Item = &Self::Node> {
         let (start, width) = (root.index, root.width);
@@ -103,21 +103,21 @@ where
 }
 
 /// Iterator for a depth-first iteration over a tree that implements [super::DirectionIterable].
-pub struct DepthFirstIterator<'a, 'b, T, N>
+pub struct DepthFirstIterator<'a, 'b, LoadType, IdType>
 where
     'a: 'b,
-    T: 'static + Debug + PartialEq,
+    LoadType: 'static + Debug + PartialEq,
 {
-    tree: &'a DirectedArenaTree<T, N>,
+    tree: &'a DirectedArenaTree<LoadType, IdType>,
     stack: Vec<std::slice::Iter<'b, ArenaIndex>>,
     root: Option<ArenaIndex>,
 }
 
-impl<'a, T, N> DepthFirstIterator<'a, '_, T, N>
+impl<'a, LoadType, IdType> DepthFirstIterator<'a, '_, LoadType, IdType>
 where
-    T: 'static + Debug + PartialEq,
+    LoadType: 'static + Debug + PartialEq,
 {
-    pub fn new(tree: &'a DirectedArenaTree<T, N>, root: ArenaIndex) -> Self {
+    pub fn new(tree: &'a DirectedArenaTree<LoadType, IdType>, root: ArenaIndex) -> Self {
         let stack = Vec::with_capacity(tree.max_depth);
         println!("Creating new depth-first iterator (slow)");
         DepthFirstIterator {
@@ -127,11 +127,11 @@ where
         }
     }
 }
-impl<'a, T, N> Iterator for DepthFirstIterator<'a, '_, T, N>
+impl<'a, LoadType, IdType> Iterator for DepthFirstIterator<'a, '_, LoadType, IdType>
 where
-    T: Debug + PartialEq,
+    LoadType: Debug + PartialEq,
 {
-    type Item = &'a ArenaNode<T, N>;
+    type Item = &'a ArenaNode<LoadType, IdType>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(root) = &self.root {

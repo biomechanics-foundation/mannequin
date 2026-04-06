@@ -22,13 +22,13 @@ pub struct ArenaIndex(pub usize);
 ///
 /// Some of the available Fields are used to speed up iteration.
 #[derive(Debug)]
-pub struct ArenaNode<Load, NodeId> {
+pub struct ArenaNode<LoadType, IdType> {
     /// The user-defined load that the node owns
-    pub(super) load: Load,
+    pub(super) load: LoadType,
     /// Index in the arena allocation
     pub(super) index: ArenaIndex,
     /// identifier for lookups
-    pub(super) id: NodeId,
+    pub(super) id: IdType,
     /// references for children
     pub(super) children: Vec<ArenaIndex>,
     /// Used to optize sub-tree, depth-first traversal in [DepthFirstArenaTree]
@@ -39,10 +39,10 @@ pub struct ArenaNode<Load, NodeId> {
     parent_ref: Option<ArenaIndex>,
 }
 
-impl<Load, NodeRef> ArenaNode<Load, NodeRef> {
+impl<LoadType, IdType> ArenaNode<LoadType, IdType> {
     fn new(
-        payload: Load,
-        node_ref: NodeRef,
+        payload: LoadType,
+        node_ref: IdType,
         index: ArenaIndex,
         width: usize,
         children: Vec<ArenaIndex>,
@@ -61,15 +61,15 @@ impl<Load, NodeRef> ArenaNode<Load, NodeRef> {
     }
 }
 
-impl<Load, NodeRef> NodeLike<Load, NodeRef> for ArenaNode<Load, NodeRef>
+impl<LoadType, IdType> NodeLike<LoadType, IdType> for ArenaNode<LoadType, IdType>
 where
-    NodeRef: Clone,
+    IdType: Clone,
 {
     fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }
 
-    fn get(&self) -> &Load {
+    fn get(&self) -> &LoadType {
         &self.load
     }
 
@@ -78,18 +78,18 @@ where
     }
 
     // FIXME ... why a clone here
-    fn id(&self) -> &NodeRef {
+    fn id(&self) -> &IdType {
         &self.id //.clone()
     }
 
-    fn get_mut(&mut self) -> &mut Load {
+    fn get_mut(&mut self) -> &mut LoadType {
         &mut self.load
     }
 }
 
-impl<Load, NodeRef> fmt::Display for ArenaNode<Load, NodeRef>
+impl<LoadType, IdType> fmt::Display for ArenaNode<LoadType, IdType>
 where
-    Load: fmt::Display,
+    LoadType: fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -108,18 +108,18 @@ where
 ///
 /// The tree is mutable, that is, adding nodes possible, unlike in
 /// the trees optimized for a single direction.
-pub struct DirectedArenaTree<Load, NodeID> {
+pub struct DirectedArenaTree<LoadType, IdType> {
     /// Memory allocated area for nodes
-    pub(crate) nodes: Vec<ArenaNode<Load, NodeID>>,
+    pub(crate) nodes: Vec<ArenaNode<LoadType, IdType>>,
 
     pub(super) max_depth: usize,
 
     // TODO optimization: https://crates.io/crates/rustc-hash (feature)
     /// Lookup arena indices
-    pub(super) lookup: HashMap<NodeID, ArenaIndex>,
+    pub(super) lookup: HashMap<IdType, ArenaIndex>,
 }
 
-impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
+impl<LoadType, IdType> DirectedArenaTree<LoadType, IdType> {
     /// Constructor. Sorting indicates whether the elements are stored to
     /// make either deoth or breadth first traversal efficient (slow insertion). `None` indicates
     /// that the data will be unordered (fast insertion, slower traversal).
@@ -150,7 +150,7 @@ impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
 
     /// Given an squenze of nodes (i.e., an areana), update the references to child nodes when
     /// the arena is reorderd. It takes a sequence of the same size with the new indices as a parameter
-    pub(super) fn update_child_indices(nodes: &mut [ArenaNode<Load, NodeId>], indices: &[ArenaIndex]) {
+    pub(super) fn update_child_indices(nodes: &mut [ArenaNode<LoadType, IdType>], indices: &[ArenaIndex]) {
         nodes.iter_mut().for_each(|node| {
             node.children.iter_mut().for_each(|child_ref| {
                 *child_ref = ArenaIndex(
@@ -170,24 +170,24 @@ impl<Load, NodeId> DirectedArenaTree<Load, NodeId> {
     }
 }
 
-impl<Load, NodeId> Default for DirectedArenaTree<Load, NodeId> {
+impl<LoadType, IdType> Default for DirectedArenaTree<LoadType, IdType> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Load, NodeId> BaseDirectionIterable<Load, NodeId> for DirectedArenaTree<Load, NodeId>
+impl<LoadType, IdType> BaseDirectionIterable<LoadType, IdType> for DirectedArenaTree<LoadType, IdType>
 where
-    Load: 'static + fmt::Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
+    LoadType: 'static + fmt::Debug + PartialEq,
+    IdType: Eq + 'static + Clone + Hash + Debug,
 {
-    type Node = ArenaNode<Load, NodeId>;
+    type Node = ArenaNode<LoadType, IdType>;
 
-    fn root(&self) -> Result<&Self::Node, MannequinError<NodeId>> {
+    fn root(&self) -> Result<&Self::Node, MannequinError<IdType>> {
         self.nodes.first().ok_or_else(|| MannequinError::RootNotSet)
     }
 
-    fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<NodeId>> {
+    fn children(&self, node: &Self::Node) -> Result<Vec<&Self::Node>, MannequinError<IdType>> {
         let id = node.id();
         // can we rely on this check?
         self.node_by_id(id).ok_or(MannequinError::UnknownNode(id.clone()))?;
@@ -200,11 +200,11 @@ where
             .collect_vec())
     }
 
-    fn node_by_load(&self, load: &Load) -> Option<&Self::Node> {
+    fn node_by_load(&self, load: &LoadType) -> Option<&Self::Node> {
         self.nodes.iter().find(|node| node.load == *load)
     }
 
-    fn node_by_id(&self, node_ref: &NodeId) -> Option<&Self::Node> {
+    fn node_by_id(&self, node_ref: &IdType) -> Option<&Self::Node> {
         let index = self.lookup.get(node_ref)?;
         self.nodes.get(index.0)
     }
@@ -218,10 +218,10 @@ where
     }
 }
 
-impl<Load, NodeId> DirectionIterable<Load, NodeId> for DirectedArenaTree<Load, NodeId>
+impl<LoadType, IdType> DirectionIterable<LoadType, IdType> for DirectedArenaTree<LoadType, IdType>
 where
-    Load: 'static + fmt::Debug + PartialEq,
-    NodeId: Eq + 'static + Clone + Hash + Debug,
+    LoadType: 'static + fmt::Debug + PartialEq,
+    IdType: Eq + 'static + Clone + Hash + Debug,
 {
     fn iter_depth(&self) -> impl Iterator<Item = &Self::Node> {
         Box::new(DepthFirstIterator::new(self, ArenaIndex(0)))
@@ -239,8 +239,8 @@ where
         Box::new(BreadthFirstIterator::new(self, root.index))
     }
 
-    fn depth_first(self) -> impl crate::DepthFirstIterable<Load, NodeId> {
-        let result: DepthFirstArenaTree<Load, NodeId> = self.into();
+    fn depth_first(self) -> impl crate::DepthFirstIterable<LoadType, IdType> {
+        let result: DepthFirstArenaTree<LoadType, IdType> = self.into();
         result
     }
 
@@ -248,7 +248,7 @@ where
     //     unimplemented!();
     // }
 
-    fn add(&mut self, load: Load, node_id: NodeId, parent: &NodeId) -> Result<NodeId, MannequinError<NodeId>> {
+    fn add(&mut self, load: LoadType, node_id: IdType, parent: &IdType) -> Result<IdType, MannequinError<IdType>> {
         let parent = self
             .node_by_id(parent)
             .ok_or(MannequinError::UnknownNode(parent.clone()))?;
@@ -299,9 +299,9 @@ where
         Ok(self.nodes.last().unwrap().id.clone())
     }
 
-    fn set_root(&mut self, root_load: Load, root_ref: NodeId) -> NodeId {
+    fn set_root(&mut self, root_load: LoadType, root_ref: IdType) -> IdType {
         self.nodes.clear();
-        let root = ArenaNode::<Load, NodeId>::new(root_load, root_ref.clone(), ArenaIndex(0), 1, vec![], 0, None);
+        let root = ArenaNode::<LoadType, IdType>::new(root_load, root_ref.clone(), ArenaIndex(0), 1, vec![], 0, None);
         self.nodes.push(root);
         self.lookup.insert(root_ref, ArenaIndex(0));
         self.nodes[0].id.clone()

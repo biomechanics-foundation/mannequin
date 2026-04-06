@@ -32,11 +32,11 @@ pub mod mannequin;
 pub use arena::{
     BreadthFirstIterable, DepthFirstArenaTree, DepthFirstIterable, DirectedArenaTree, DirectionIterable, NodeLike,
 };
-pub use differentiable::{Differentiable, DifferentiableModel};
+pub use differentiable::Differentiable;
 pub use errors::MannequinError;
-pub use forward::{Forward, ForwardModel};
-pub use inverse::{DifferentialInverseModel, Inverse};
-pub use mannequin::{Mannequin, Rigid};
+pub use forward::{Articulated, ForwardModel};
+pub use inverse::Inverse;
+pub use mannequin::Rigid;
 // Backends
 #[cfg(feature = "faer")]
 pub mod faer;

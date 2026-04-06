@@ -1,122 +1,211 @@
-//! Interface and basic implementor for the forward kinematic model.
+//! Interface and basic implementer for the forward kinematic model.
 //!
 //! Contains additional useful extension to the iterators over a tree
 //! that can be shared by implementers of the trait.
 
-use std::marker::PhantomData;
-
-use itertools::Itertools;
+use itertools::{izip, Itertools};
 
 use crate::{DepthFirstIterable, NodeLike, Rigid};
-use std::{fmt::Debug, hash::Hash};
-/// TODO
-#[derive(Default)]
-struct Forwardconfig<'a, I>
-where
-    I: Eq + Clone + Hash + Debug,
-{
-    max_depth: usize,
-    selected_joints: Vec<&'a I>,
-    selected_effectors: vec<&'a I>,
-    // Selection of active joints and effectors
-}
+use std::{collections::HashSet, fmt::Debug, hash::Hash, marker::PhantomData};
 
 /// Trait representing a stateful forward kinematics algorithm. It allows selecting the effectors to be
 /// computed and thus a specific (or multiple) kinematic chain(s).
-pub trait Forward<'a, Node, Load, NodeRef, Tree, NodeId>
+/// Implemented for DepthFirstIterable; make a newtype to implement an ANN based IK for instance.
+pub trait Articulated<NodeType, LoadType, TreeType, IdType>:
+    DepthFirstIterable<LoadType, IdType, Node = NodeType>
 where
-    Load: Rigid,
-    Node: NodeLike<Load, NodeRef> + 'a,
-    NodeId: Eq + Clone + Hash + Debug,
-    Tree: DepthFirstIterable<Load, NodeId, Node = Node>,
+    LoadType: Rigid,
+    NodeType: NodeLike<LoadType, IdType>,
+    IdType: Eq + Clone + Hash + Debug,
 {
-    fn accumulate(
-        &'a self,
-        params: &[Load::FloatType],
-        max_depth: usize,
-    ) -> impl Iterator<Item = (&'a Node, Load::Transformation)>;
+    // Comments (here, in differential and inverse):
+    // - we want to avoid copying the config but rather store it as a reference in model
+    // - we could add another lifetime(s) to the trait, but semantically it
+    //   fits better to lifetimes the `pose` method (probably not the only advantage)
+    // - we need to use GAT with lifetime(s)
+    // - we need to make sure that 'x is the object's lifetime: https://github.com/rust-lang/rust/issues/87479
+    type Model<'x, 'y>: Forward<LoadType::FloatType>
+    where
+        Self: 'x;
+    type Config;
 
-    fn forward<'b>(
-        &'a self,
-        params: &[Load::FloatType],
-        config: &'b Forwardconfig<'a, NodeId>,
-    ) -> ForwardModel<'a, 'b, Node, Load, NodeRef, Tree, NodeId>;
-    // fn setup(&mut self, tree: &IT, selected_effectors: &[&<RB as Rigid>::NodeId]);
-    // fn solve(&mut self, tree: &IT, params: &[RB::FloatType]) -> Vec<&[RB::FloatType]>;
+    fn accumulate(
+        &self,
+        params: &[LoadType::FloatType],
+        max_depth: usize,
+    ) -> impl Iterator<Item = LoadType::Transformation>;
+
+    fn pose<'a, 'b>(&'a self, params: &[LoadType::FloatType], config: &'b Self::Config) -> Self::Model<'a, 'b>;
+
+    fn config(
+        &self,
+        selected_joints: Vec<&IdType>,
+        selected_effectors: Vec<&IdType>,
+        max_depth: usize,
+    ) -> ForwardConfig;
+    // TODO second forward that copies from old Self::Model
 }
 
-impl<'a, Node, Load, NodeRef, NodeId, Tree> Forward<'a, Node, Load, NodeRef, Tree, NodeId> for Tree
+impl<NodeType, LoadType, IdType, TreeType, FloatType> Articulated<NodeType, LoadType, TreeType, IdType> for TreeType
 where
-    Node: NodeLike<Load, NodeRef> + 'a,
-    Load: Rigid,
-    // FIXME: Implement on DepthFirst
-    // T: Iterator<Item = &'a Node>,
-    NodeId: Eq + Clone + Hash + Debug,
-    Tree: DepthFirstIterable<Load, NodeId, Node = Node>,
+    NodeType: NodeLike<LoadType, IdType>,
+    LoadType: Rigid<FloatType = FloatType>,
+    IdType: Eq + Clone + Hash + Debug,
+    TreeType: DepthFirstIterable<LoadType, IdType, Node = NodeType>,
 {
+    type Model<'x, 'y>
+        = ForwardModel<'x, 'y, NodeType, LoadType, TreeType, IdType>
+    where
+        Self: 'x;
+    type Config = ForwardConfig;
     fn accumulate(
-        &'a self,
-        params: &[Load::FloatType],
+        &self,
+        params: &[LoadType::FloatType],
         max_depth: usize,
-    ) -> impl Iterator<Item = (&'a Node, <Load as Rigid>::Transformation)> {
+    ) -> impl Iterator<Item = <LoadType as Rigid>::Transformation> {
         self.iter().enumerate().scan(
-            Vec::<Load::Transformation>::with_capacity(max_depth),
+            Vec::<LoadType::Transformation>::with_capacity(max_depth),
             |stack, (index, node)| {
                 while node.depth() < stack.len() {
                     stack.pop();
                 }
-                let current = Load::concat(
-                    stack.last().unwrap_or(&Load::neutral_element()),
+                let current = LoadType::concat(
+                    stack.last().unwrap_or(&LoadType::neutral_element()),
                     &node.get().transform(params, index),
                 );
                 stack.push(current.clone());
-                Some((node, current))
+                Some(current)
             },
         )
     }
 
-    fn forward<'b>(
-        &'a self,
-        params: &[Load::FloatType],
-        config: &'b Forwardconfig<'a, NodeId>,
-    ) -> ForwardModel<'a, 'b, Node, Load, NodeRef, Tree, NodeId> {
+    /// Computes local coordinate frames.
+    fn pose<'a, 'b>(&'a self, params: &[LoadType::FloatType], config: &'b Self::Config) -> Self::Model<'a, 'b> {
+        // ForwardModel<'a, 'b, NodeType, LoadType, TreeType, IdType> {
         let transformations = self.accumulate(params, config.max_depth).collect_vec();
+
+        // let sizes = self.iter().map(|n| n.get().effector_size()).collect();
         ForwardModel {
             transformations,
             tree: self,
-            config,
-            _noderef: PhantomData,
             _nodeid: PhantomData,
+            config,
+        }
+    }
+
+    /// Computes values that typically don't change often compared to the `params` in [forward()](Forward::forward).
+    fn config(&self, selected_joints: Vec<&IdType>, selected_effectors: Vec<&IdType>, max_depth: usize) -> ForwardConfig
+    where
+        TreeType: DepthFirstIterable<LoadType, IdType>,
+        IdType: Eq + Clone + Hash + Debug,
+    {
+        let selected_joints = if selected_joints.is_empty() {
+            vec![true; self.len()]
+        } else {
+            let selected_joints: HashSet<&IdType> = HashSet::from_iter(selected_joints.iter().copied());
+
+            self.iter().map(|n| selected_joints.contains(&n.id())).collect()
+        };
+        let selected_effectors_map: HashSet<&IdType> = HashSet::from_iter(selected_effectors.iter().copied());
+        let selected_effectors = self.iter().map(|n| selected_effectors_map.contains(&n.id())).collect();
+        let rows = self
+            .iter()
+            .map(|node| {
+                if selected_effectors_map.contains(&node.id()) {
+                    node.get().effector_size()
+                } else {
+                    0
+                }
+            })
+            .sum();
+
+        let offsets = self
+            .iter()
+            .scan(0, |offset, node| {
+                let result = Some(*offset);
+                if selected_effectors_map.contains(&node.id()) {
+                    *offset += node.get().effector_size();
+                }
+                result
+            })
+            .collect();
+        let cols = selected_joints.iter().filter(|&selected| *selected).count();
+
+        let sizes = self.iter().map(|n| n.get().effector_size()).collect();
+        ForwardConfig {
+            max_depth,
+            selected_joints,
+            selected_effectors,
+            rows,
+            cols,
+            offsets,
+            sizes,
         }
     }
 }
 
-/// Default forward kinematics that is only a thin wrapper around an [Differentiable] instance.
-pub struct ForwardModel<'a, 'b, Node, Load, Noderef, Tree, NodeId>
-where
-    Node: NodeLike<Load, Noderef> + 'a,
-    Load: Rigid,
-    Tree: DepthFirstIterable<Load, NodeId>,
-    NodeId: Eq + Clone + Hash + Debug,
-{
-    transformations: Vec<(&'a Node, Load::Transformation)>,
-    tree: &'a Tree,
-    config: &'b Forwardconfig<'a, NodeId>,
-    _noderef: PhantomData<Noderef>,
-    _nodeid: PhantomData<NodeId>,
+#[derive(Default)]
+pub struct ForwardConfig {
+    pub max_depth: usize,
+    pub selected_joints: Vec<bool>,
+    pub selected_effectors: Vec<bool>,
+    pub offsets: Vec<usize>,
+    pub sizes: Vec<usize>,
+    pub rows: usize,
+    pub cols: usize, // Selection of active joints and effectors
 }
 
-impl<'a, 'b, Node, Load, Noderef, Tree, NodeId> ForwardModel<'a, 'b, Node, Load, Noderef, Tree, NodeId>
+/// Default forward kinematics that is only a thin wrapper around an [Differentiable] instance.
+/// Holds references to a configuration and the tree.
+pub struct ForwardModel<'a, 'b, NodeType, LoadType, TreeType, IdType>
 where
-    Node: NodeLike<Load, Noderef> + 'a,
-    Load: Rigid,
-    Tree: DepthFirstIterable<Load, NodeId>,
-    NodeId: Eq + Clone + Hash + Debug,
+    LoadType: Rigid,
+    NodeType: NodeLike<LoadType, IdType>,
+    TreeType: 'a + DepthFirstIterable<LoadType, IdType, Node = NodeType>,
+    IdType: Eq + Clone + Hash + Debug,
 {
-    fn effectors(&self) -> Vec<&[Load::FloatType]> {
+    _nodeid: PhantomData<IdType>,
+    pub transformations: Vec<LoadType::Transformation>,
+    // pub transformations: Vec<(&'a NodeType, LoadType::Transformation)>,
+    pub tree: &'a TreeType,
+    pub config: &'b ForwardConfig,
+}
+
+pub trait Forward<F> {
+    fn effectors(&self) -> Vec<&[F]>;
+    fn flat_effectors(&self) -> Vec<F>;
+}
+
+impl<'a, 'b, NodeType, LoadType, TreeType, IdType, FloatType> Forward<FloatType>
+    for ForwardModel<'a, 'b, NodeType, LoadType, TreeType, IdType>
+where
+    LoadType: Rigid<FloatType = FloatType>,
+    NodeType: NodeLike<LoadType, IdType>,
+    TreeType: DepthFirstIterable<LoadType, IdType, Node = NodeType>,
+    IdType: Eq + Clone + Hash + Debug,
+{
+    fn effectors(&self) -> Vec<&[LoadType::FloatType]> {
+        //     // &mut col[*offset..*offset + effector_node.get().effector_size()],
+
+        //     izip!(&self.selected_effectors, &self.offsets, &self.sizes)
+        //         .filter_map(|(&s, &i, &n)| if s { Some(&self.configuration[i..i + n]) } else { None })
+        //         .collect_vec()
         todo!()
     }
-    fn flat_effectors(&self) -> &[Load::FloatType] {
+    fn flat_effectors(&self) -> Vec<LoadType::FloatType> {
+        // let mut effectors = vec![LoadType::FloatType::zero(); self.rows()];
+
+        // izip!(
+        //     &self.tree,
+        //     &self.transformations,
+        //     &self.selected_effectors,
+        //     &self.offsets
+        // )
+        // .filter_map(|(node, pose, selected, offset)| if *selected { Some((node, pose, offset)) } else { None })
+        // .for_each(|(node, pose, offset)| {
+        //     node.get().effector(pose, &mut effectors, *offset);
+        // });
+        // effectors
         todo!()
     }
 }
@@ -143,7 +232,7 @@ where
 // {
 //     fn accumulate(
 //         self,
-//         params: &[Load::FloatType],
+//         params: &[LoadType::FloatType],
 //         max_depth: usize,
 //     ) -> impl Iterator<Item = (&'a Node, <Load as Rigid>::Transformation)> {
 //         self.into_iter().enumerate().scan(

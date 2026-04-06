@@ -4,13 +4,95 @@
 //! The algorithms are independent of
 //! the numerical backend and support [f32] and [f64] floating point representations.
 
-use crate::{arena::DepthFirstIterator, forward::TransformationAccumulation, DepthFirstIterable, NodeLike, Rigid};
+use crate::{DepthFirstIterable, ForwardModel, NodeLike, Rigid};
 use itertools::{izip, Itertools};
 use num_traits::Float;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
-use std::{collections::HashSet, fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash};
 
+pub trait Differentiable<T> {
+    fn jacobian(&self) -> Vec<T>;
+}
+
+impl<'a, 'b, NodeType, LoadType, TreeType, IdType, FloatType> Differentiable<FloatType>
+    for ForwardModel<'a, 'b, NodeType, LoadType, TreeType, IdType>
+where
+    LoadType: Rigid<FloatType = FloatType>,
+    FloatType: Float,
+    NodeType: NodeLike<LoadType, IdType>,
+    TreeType: 'a + DepthFirstIterable<LoadType, IdType, Node = NodeType>,
+    IdType: Eq + Clone + Hash + Debug,
+{
+    fn jacobian(&self) -> Vec<FloatType> {
+        let mut jacobian = vec![FloatType::zero(); self.config.rows * self.config.cols];
+
+        jacobian
+            // .iter_mut()
+            // FIXME: Row below can panic .. handle errors
+            // Column-major!
+            .chunks_mut(self.config.rows)
+            // TODO use rayon
+            .zip(
+                izip!(self.tree.iter(), &self.transformations, &self.config.selected_joints)
+                    // self.transformations
+                    // .iter()
+                    // .zip(self.selected_joints.iter()) // Add the selected joint lists
+                    .filter_map(|(node, trafo, selected)| if *selected { Some((node, trafo)) } else { None }), // filter inactive joints and remove flag
+                                                                                                               //par_iter()
+            )
+            .enumerate()
+            .for_each(|(idx, (col, (joint_node, joint_pose)))| {
+                izip!(
+                    self.tree.iter_sub(joint_node), // iterating over the child tree
+                    // zipping the corresponding trafos (by skipping until the current node) and the offsets in the column
+                    // Using the index here is ok, keeping an iterator is to hard (gets mutated in a different closure)
+                    self.transformations.iter().skip(idx),
+                    self.config.offsets.iter().skip(idx),
+                    self.config.selected_effectors.iter().skip(idx)
+                )
+                .filter(|(_, _, _, selected)| **selected)
+                .for_each(|(effector_node, effector_pose, offset, _)| {
+                    // The slice of the column is itself a column-first matrix
+                    effector_node.get().partial_derivative(
+                        effector_pose,
+                        joint_node.get(),
+                        joint_pose,
+                        col,
+                        // &mut col[*offset..*offset + effector_node.get().effector_size()],
+                        *offset,
+                    );
+                });
+            });
+        jacobian
+    }
+}
+
+/// Helper trait that is implemented for all iterators. Is used
+/// to filter a sequence by the output of [Differentiable::active].
+///
+/// Example:
+///
+/// ```rs
+/// current_angles
+///    .iter_mut() // iterate over all to update
+///    .filter_active(self.differentiable.active()) // modify only active joints
+///    .zip(&result) // get updates and update
+///    .for_each(|(angle, update)| { *angle += update });
+/// ```
+pub trait Filterable<T> {
+    fn filter_active(self, active: &[bool]) -> impl Iterator<Item = T>;
+}
+
+impl<T, I> Filterable<T> for I
+where
+    I: Iterator<Item = T>,
+{
+    fn filter_active(self, active: &[bool]) -> impl Iterator<Item = T> {
+        self.zip(active.iter())
+            .filter_map(|(a, b)| if *b { Some(a) } else { None })
+    }
+}
 // /// Computation shares common intermediate results. This enum
 // /// allows selecting which results should be computed.
 // pub enum ComputeSelection {
@@ -22,63 +104,62 @@ use std::{collections::HashSet, fmt::Debug, hash::Hash, marker::PhantomData};
 //     All,
 // }
 
-struct Differentiated<F: Float> {
-    /// Jacobian matrix as a flattened, column-major array.
-    jacobian: Vec<F>,
-    /// Flattened result of the forwards kinematics.
-    effectors: Vec<F>,
-}
+// struct Differentiated<F: Float> {
+//     /// Jacobian matrix as a flattened, column-major array.
+//     jacobian: Vec<F>,
+//     /// Flattened result of the forwards kinematics.
+//     effectors: Vec<F>,
+// }
 
 /*
 /// Mathematical, differentiable representation of a kinematic model. Implementers do the heavy
 /// lifting in [crate::ForwardModel] and [crate::DifferentialInverseModel] by computing the
-/// Jacobian matrix (partial derivatives) are useful in sovlers. They can be implemented in
+/// Jacobian matrix (partial derivatives) are useful in solvers. They can be implemented in
 /// different ways [[1](https://ieeexplore.ieee.org/document/6177279)] which is the reason for this
 /// additional layer of abstraction.
 */
 
-pub trait Differentiable<F, T, I, R>
-where
-    T: DepthFirstIterable<R, I>,
-    I: Eq + Clone + Hash + Debug,
-    R: Rigid<FloatType = F>,
-    F: Float,
-{
-    // Document this (blog). It's required for returning a reference to internal data
-    // type Data<'a>
-    // where
-    //     Self: 'a; // https://github.com/rust-lang/rust/issues/87479
+// pub trait DifferentiableOld<F, T, I, R>
+// where
+//     T: DepthFirstIterable<R, I>,
+//     I: Eq + Clone + Hash + Debug,
+//     R: Rigid<FloatType = F>,
+//     F: Float,
+// {
+//     // Document this (blog). It's required for returning a reference to internal data
+//     // type Data<'a>
+//     // where
+//     //     Self: 'a; // https://github.com/rust-lang/rust/issues/87479
 
-    /*
-    /// returns a reference to the internal data type . Call [Differentiable::compute] first. Column-major!
-    fn jacobian(&self) -> &[F];
-    /// Result of the forward kinematics stored in a flat `Vec` to be used in a gradient decent.
-    /// Call [Differentiable::compute] first.
-    fn flat_effectors(&self) -> &[F];
-    /// Result of the forward kinematics as a nested `Vec`. Call [Differentiable::setup] first.
-    fn effectors(&self) -> Vec<&[F]>;
+//     /*
+//     /// returns a reference to the internal data type . Call [Differentiable::compute] first. Column-major!
+//     fn jacobian(&self) -> &[F];
+//     /// Result of the forward kinematics stored in a flat `Vec` to be used in a gradient decent.
+//     /// Call [Differentiable::compute] first.
+//     fn flat_effectors(&self) -> &[F];
+//     /// Result of the forward kinematics as a nested `Vec`. Call [Differentiable::setup] first.
+//     fn effectors(&self) -> Vec<&[F]>;
 
-    /// Prepare algorithms for computation. This avoids memory allocation when calling [Differentiable::compute].
-    ///
-    /// Warning! The order of the IDs in `selected_joints` and `selected_effectors` does not matter (they are may be
-    /// converted into a [HashSet] immediately). The methods [Differentiable::effectors], [Differentiable::flat_effectors],
-    /// [Differentiable::jacobian], is determined only by the order of the nodes in the tree!
-    fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &[&I], selected_effectors: &[&I])
-    where
-        T: DepthFirstIterable<R, I>,
-        R: Rigid<FloatType = F>,
-        I: Eq + Clone + Hash + Debug;
-    */
+//     /// Prepare algorithms for computation. This avoids memory allocation when calling [Differentiable::compute].
+//     ///
+//     /// Warning! The order of the IDs in `selected_joints` and `selected_effectors` does not matter (they are may be
+//     /// converted into a [HashSet] immediately). The methods [Differentiable::effectors], [Differentiable::flat_effectors],
+//     /// [Differentiable::jacobian], is determined only by the order of the nodes in the tree!
+//     fn setup<T, R, I>(&mut self, tree: &T, selected_joints: &[&I], selected_effectors: &[&I])
+//     where
+//         T: DepthFirstIterable<R, I>,
+//         R: Rigid<FloatType = F>,
+//         I: Eq + Clone + Hash + Debug;
+//     */
+//     fn differentiable<'a, 'b>(
+//         &'a self,
+//         params: &'b [<R as Rigid>::FloatType],
+//         selected_joints: &[&I],
+//         selected_effectors: &[&I],
+//     ) -> DifferentiableModel<'a, 'b, F, T, R, I>;
+// }
 
-    fn differentiable<'a, 'b>(
-        &'a self,
-        params: &'b [<R as Rigid>::FloatType],
-        selected_joints: &[&I],
-        selected_effectors: &[&I],
-    ) -> DifferentiableModel<'a, 'b, F, T, R, I>;
-}
-
-impl<F, R, I, T> Differentiable<F, T, I, R> for T
+/* impl<F, R, I, T> DifferentiableOld<F, T, I, R> for T
 where
     T: DepthFirstIterable<R, I>,
     R: Rigid<FloatType = F>,
@@ -160,7 +241,7 @@ where
             transformations,
         }
     }
-}
+} */
 
 /*
     /// Compute is necessary as the structure holds the memory for the jacobian and the forward vector.
@@ -184,7 +265,7 @@ where
 }
 */
 
-/// Helper trait that is implemented for all iterators. Is used
+/* /// Helper trait that is implemented for all iterators. Is used
 /// to filter a sequence by the output of [Differentiable::active].
 ///
 /// Example:
@@ -208,12 +289,12 @@ where
         self.zip(active.iter())
             .filter_map(|(a, b)| if *b { Some(a) } else { None })
     }
-}
+} */
 
 // Note: Won't make the trait itself generic. That would be cleaner but mean more overhead
 // (i.e., requiring full qualifiers in compositions)
 
-/// Backend-agnostic implementation of algorithms for computing the forward kinematics
+/* /// Backend-agnostic implementation of algorithms for computing the forward kinematics
 /// and partial derivatives (i.e, Jacobian matrix) or the application in inverse kinematics
 /// solvers. Generic in the floating point representation.
 #[derive(Debug)]
@@ -340,6 +421,7 @@ where
         Differentiated { jacobian, effectors }
     }
 }
+    */
 
 #[cfg(feature = "ndarray")]
 #[cfg(test)]

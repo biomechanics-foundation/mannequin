@@ -6,7 +6,7 @@
 
 use num_traits::Float;
 
-use crate::{DepthFirstIterable, Forward, Inverse};
+use crate::{Articulated, DepthFirstArenaTree, DepthFirstIterable, Inverse};
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 /// A Rigid Body represents a single, rigid link connected to other links via a joint.
@@ -20,7 +20,7 @@ pub trait Rigid: PartialEq {
     /// Vec, \[f64;4\], ...
     type Point;
 
-    type FloatType: Float;
+    type FloatType: Float + 'static;
 
     // TODO Explain why this is defined on Rigid (the node) and not Mannequin (the tree) .. in short: otherwise this would be another generic and mannequin.rs would be unreadable because of trait bounds. This way it is quite elegant
     type NodeId: Eq + Hash + Clone + Debug;
@@ -95,13 +95,29 @@ pub trait Rigid: PartialEq {
     );
 }
 
-/// Struct for holding the composition of character animation algorithms in a flat architecture for
+pub struct Mannequin<LoadType, IdType>
+where
+    LoadType: Rigid,
+    IdType: Eq + Clone + Hash + Debug,
+{
+    pub kinematics: DepthFirstArenaTree<LoadType, IdType>,
+}
+
+impl<LoadType, IdType> Mannequin<LoadType, IdType>
+where
+    LoadType: Rigid,
+    IdType: Eq + Clone + Hash + Debug,
+{
+    // loaders and converters on this type.
+}
+
+/* /// Struct for holding the composition of character animation algorithms in a flat architecture for
 /// character animation.
 pub struct Mannequin<IT, RB, FK, IK>
 where
     RB: Rigid,
     IT: DepthFirstIterable<RB, RB::NodeId>,
-    FK: Forward<IT, RB>,
+    FK: Parameterizable<IT, RB>,
     IK: Inverse<IT, RB>,
 {
     pub tree: IT,
@@ -115,7 +131,7 @@ impl<IT, RB, FK, IK> Mannequin<IT, RB, FK, IK>
 where
     RB: Rigid,
     IT: DepthFirstIterable<RB, RB::NodeId>,
-    FK: Forward<IT, RB>,
+    FK: Parameterizable<IT, RB>,
     IK: Inverse<IT, RB>,
 {
     pub fn new(tree: IT, forward_kinematics: FK, inverse_kinematics: IK) -> Self {
@@ -143,4 +159,4 @@ where
         // self.ik.solve(&self.tree, param, target_val)
         todo!()
     }
-}
+} */
