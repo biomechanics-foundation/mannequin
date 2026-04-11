@@ -431,7 +431,7 @@ mod tests {
 
     use super::*;
     use crate::ndarray::robot::{Axis, LinkNodeId, Segment};
-    use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable};
+    use crate::{Articulated, DepthFirstArenaTree, DirectedArenaTree, DirectionIterable};
     use approx::assert_abs_diff_eq;
     use ndarray::{prelude::*, Order};
 
@@ -459,27 +459,26 @@ mod tests {
         tree.add(link5, "link5".to_string(), &ref4).unwrap();
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
-        let mut jacobian = DifferentiableModel::<f64>::new();
-
-        jacobian.setup(
-            &tree,
-            &[
+        let config = tree.config(
+            vec![
                 &"link1".to_string(),
                 &"link2".to_string(),
                 &"link3".to_string(),
                 &"link4".to_string(),
             ],
-            &[&"link2".to_string(), &"link4".to_string()],
+            vec![&"link2".to_string(), &"link4".to_string()],
+            42,
         );
 
-        jacobian.compute(
-            &tree,
+        let pose = tree.pose(
             &[0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2, 0.0],
-            ComputeSelection::JacobianOnly,
+            &config,
         );
 
-        let result = ArrayView1::<f64>::from(jacobian.jacobian())
-            .into_shape_with_order(((jacobian.rows(), jacobian.cols()), Order::ColumnMajor))
+        let jacobian = pose.jacobian();
+
+        let result = ArrayView1::<f64>::from(&jacobian)
+            .into_shape_with_order(((config.rows, config.cols), Order::ColumnMajor))
             .unwrap();
 
         let target = array![
@@ -491,7 +490,7 @@ mod tests {
             [0.0, 0.0, 0.0, 0.0,]
         ];
 
-        assert_eq!(jacobian.shape(), (6, 4));
+        assert_eq!((config.rows, config.cols), (6, 4));
         assert_abs_diff_eq!(result, target, epsilon = 1e-6);
     }
 }

@@ -316,14 +316,13 @@ mod tests {
 
     use super::*;
     use crate::ndarray::robot::{Axis, Segment};
-    use crate::{DepthFirstArenaTree, DifferentiableModel, DirectedArenaTree, DirectionIterable};
+    use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable};
     use itertools::Itertools;
     use ndarray::prelude::*;
 
     #[test]
     fn test_fk() {
         let mut tree = DirectedArenaTree::new();
-        let mut fk = ForwardModel::new(DifferentiableModel::new());
 
         let mut trafo = Segment::neutral_element();
         trafo.slice_mut(s![..3, 3]).assign(&array![10.0, 0.0, 0.0]);
@@ -342,8 +341,12 @@ mod tests {
 
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
-        fk.setup(&tree, &[&ref2, &ref3, &ref4]);
-        let res = fk.solve(&tree, &[0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0]);
+        let selected_effectors = { todo!() };
+        let config = tree.config(vec![&ref2, &ref3, &ref4], selected_effectors, 32);
+
+        let pose = tree.pose(&[0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0], &config);
+
+        let res = pose.effectors();
         let res = res.iter().map(|&el| el.to_owned()).collect_vec();
 
         assert_eq!(

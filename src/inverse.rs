@@ -320,7 +320,7 @@ mod test {
     use super::*;
     use crate::arena::iterables::OptimizedDirectionIterable;
     use crate::ndarray::robot::{Axis, LinkNodeId, Segment};
-    use crate::{DepthFirstArenaTree, DifferentiableModel, DirectedArenaTree, DirectionIterable};
+    use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable};
     use ndarray::prelude::*;
 
     #[cfg(feature = "ndarray")]
