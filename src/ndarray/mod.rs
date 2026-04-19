@@ -101,13 +101,14 @@ pub fn cross_3d<T>(
 
 #[allow(unused_variables)]
 pub fn solve_linear(matrix: ArrayView2<f64>, vector: ArrayView1<f64>, mut target: ArrayViewMut1<f64>) {
-    // dbg!(&matrix);
+    dbg!(&matrix);
     // dbg!(matrix.t().dot(&matrix));
-    // dbg!(&vector);
+    dbg!(&vector);
 
     // This works. No idea about performance
 
     let mut pseudo_inverse = matrix.t().dot(&matrix);
+    dbg!(&pseudo_inverse);
     // regularization
     pseudo_inverse = &pseudo_inverse + 1e-5 * Array2::<f64>::eye(pseudo_inverse.nrows());
     pseudo_inverse = pseudo_inverse.inv().unwrap().dot(&matrix.t());

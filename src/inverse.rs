@@ -56,11 +56,22 @@ where
 }
 
 pub struct InverseConfig<F: Float> {
-    inital: Vec<F>,
+    initial: Vec<F>,
 
     max_iterations_count: usize,
     scale_difference: F,
     min_error: F,
+}
+
+impl<F: Float> InverseConfig<F> {
+    pub fn new(initial: Vec<F>, max_iterations_count: usize, scale_difference: F, min_error: F) -> Self {
+        Self {
+            initial,
+            max_iterations_count,
+            scale_difference,
+            min_error,
+        }
+    }
 }
 
 pub struct DifferentialIK<'a, 'b, 'c, NodeType, LoadType, TreeType, IdType>
@@ -103,9 +114,9 @@ where
     fn solve(&self, targets: &[FloatType]) -> (Vec<FloatType>, Self::Info) {
         let mut counter = 0;
         let mut error: FloatType;
-        let mut result = vec![FloatType::zero(); self.forward_config.rows]; // .differential_model.active().iter().filter(|i| **i).count()];
+        let mut result = vec![FloatType::zero(); self.forward_config.cols]; // .differential_model.active().iter().filter(|i| **i).count()];
 
-        let mut params = self.inverse_config.inital.clone();
+        let mut params = self.inverse_config.initial.clone();
 
         loop {
             dbg!(counter);
@@ -113,11 +124,15 @@ where
             let forward = self.tree.pose(&params, self.forward_config);
             // dbg!(&params);
             //
-            let effectors = forward.flat_effectors();
-            dbg!(forward.flat_effectors());
+            let effectors = forward.effector_col();
+            dbg!(&effectors);
+            dbg!(targets);
+
+            dbg!(forward.jacobian());
+            dbg!(self.forward_config);
             // dbg!(self.differential_model.effectors());
             let mut diff = izip!(targets, effectors).map(|(x, y)| (*x - y)).collect_vec();
-
+            dbg!(&diff);
             // dbg!(&self.differential_model.jacobian());
             error = diff.iter().map(|x| *x * *x).sum();
             dbg!(&error);
@@ -348,32 +363,37 @@ mod test {
         tree.add(link5, "link5".to_string(), &ref4).unwrap();
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
-        // let mut ik = DifferentialInverseModel::new(42, 10, 0.01, DifferentiableModel::new());
         let n_iterations = 13;
-        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 1.0);
 
-        ik.setup(
-            &tree,
-            &[
+        // let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 1.0);
+
+        let fk_config = tree.config(
+            vec![
                 &"link1".to_string(),
                 &"link2".to_string(),
                 &"link3".to_string(),
                 &"link4".to_string(),
             ],
-            &[&"link2".to_string(), &"link4".to_string()],
+            vec![&"link2".to_string(), &"link4".to_string()],
+            32,
         );
+
+        let param = vec![0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2, 0.0];
+        let ik_config = InverseConfig::new(param, 42, 1.0, 0.01);
+        let ik = tree.inverse(&fk_config, &ik_config);
 
         let effectors = vec![vec![20.0, 0.0, 0.0], vec![20.0, 10.0, 0.0]];
         let effectors = effectors.into_iter().flatten().collect_vec();
         // let mut param = vec![0.0; 5];
-        let mut param = vec![0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2, 0.0];
 
-        let result = ik.solve(&tree, &mut param, &effectors);
+        let result = ik.solve(&effectors);
+        dbg!(&result.0);
+        assert!(dbg!(result.1.squared_error) < 1e-2);
 
-        assert!(result.iteration_count <= n_iterations);
-        assert!(result.squared_error < 1e-2);
-        dbg!(param);
-        dbg!(result);
+        // FIXME: when using ndarray-linalg, the results are worse (more iterations)
+        assert!(dbg!(result.1.iteration_count) <= dbg!(n_iterations));
+
+        // dbg!(param);
         // assert_abs_diff_eq!(result.er, target, epsilon = 1e-6);
         // assert!(x.abs_diff_eq(&array![1., -2., -2.], 1e-9));
         // assert_abs_diff_eq!(result, target, epsilon = 1e-6);
@@ -407,26 +427,31 @@ mod test {
 
         // finalize tree
         let tree: DepthFirstArenaTree<_, _> = tree.into();
-        tree.iter().for_each(|n| {
-            dbg!(&n);
-        });
+        // tree.iter().for_each(|n| {
+        //     dbg!(&n);
+        // });
 
         let n_iterations = 13;
-        let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 0.001);
+        let fk_config = tree.config(vec![], vec![&"link_9".to_string()], 32);
+        dbg!(&fk_config);
+        let param = vec![0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2, 0.0];
+        let mut param = vec![0.0; 10];
+        let ik_config = InverseConfig::new(param, 42, 0.001, 0.01);
+        let ik = tree.inverse(&fk_config, &ik_config);
+        // let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 0.001);
 
-        ik.setup(&tree, &[], &[&"link_9".to_string()]);
+        // ik.setup(&tree, &[], &[&"link_9".to_string()]);
 
         let effectors = vec![vec![00.0, 20.0, 0.0]];
 
         let effectors = effectors.into_iter().flatten().collect_vec();
         // let mut param = vec![0.0; 5];
-        let mut param = vec![0.0; 10];
 
-        let result = ik.solve(&tree, &mut param, &effectors);
+        let result = ik.solve(&effectors);
 
         // assert_eq!(result.iteration_count, n_iterations);
-        dbg!(param);
-        dbg!(result);
+        // dbg!(param);
+        // dbg!(result);
         // assert!(x.abs_diff_eq(&array![1., -2., -2.], 1e-9));
         // assert_abs_diff_eq!(result, target, epsilon = 1e-6);
     }

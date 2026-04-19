@@ -4,6 +4,7 @@
 //! that can be shared by implementers of the trait.
 
 use itertools::{izip, Itertools};
+use num_traits::Zero;
 
 use crate::{DepthFirstIterable, NodeLike, Rigid};
 use std::{collections::HashSet, fmt::Debug, hash::Hash, marker::PhantomData};
@@ -52,6 +53,7 @@ where
     LoadType: Rigid<FloatType = FloatType>,
     IdType: Eq + Clone + Hash + Debug,
     TreeType: DepthFirstIterable<LoadType, IdType, Node = NodeType>,
+    FloatType: Zero + Clone,
 {
     type Model<'x, 'y>
         = ForwardModel<'x, 'y, NodeType, LoadType, TreeType, IdType>
@@ -83,8 +85,6 @@ where
     fn pose<'a, 'b>(&'a self, params: &[LoadType::FloatType], config: &'b Self::Config) -> Self::Model<'a, 'b> {
         // ForwardModel<'a, 'b, NodeType, LoadType, TreeType, IdType> {
         let transformations = self.accumulate(params, config.max_depth).collect_vec();
-
-        // let sizes = self.iter().map(|n| n.get().effector_size()).collect();
         ForwardModel {
             transformations,
             tree: self,
@@ -93,6 +93,7 @@ where
         }
     }
 
+    // FIXME introduce errors: if rows ==0 or cols==0 raise an error!
     /// Computes values that typically don't change often compared to the `params` in [forward()](Forward::forward).
     fn config(&self, selected_joints: Vec<&IdType>, selected_effectors: Vec<&IdType>, max_depth: usize) -> ForwardConfig
     where
@@ -107,11 +108,14 @@ where
             self.iter().map(|n| selected_joints.contains(&n.id())).collect()
         };
         let selected_effectors_map: HashSet<&IdType> = HashSet::from_iter(selected_effectors.iter().copied());
+        dbg!(&selected_effectors_map);
         let selected_effectors = self.iter().map(|n| selected_effectors_map.contains(&n.id())).collect();
+
         let rows = self
             .iter()
             .map(|node| {
-                if selected_effectors_map.contains(&node.id()) {
+                dbg!(&node.id());
+                if dbg!(selected_effectors_map.contains(&node.id())) {
                     node.get().effector_size()
                 } else {
                     0
@@ -144,7 +148,7 @@ where
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ForwardConfig {
     pub max_depth: usize,
     pub selected_joints: Vec<bool>,
@@ -166,14 +170,13 @@ where
 {
     _nodeid: PhantomData<IdType>,
     pub transformations: Vec<LoadType::Transformation>,
-    // pub transformations: Vec<(&'a NodeType, LoadType::Transformation)>,
     pub tree: &'a TreeType,
     pub config: &'b ForwardConfig,
 }
 
 pub trait Forward<F> {
-    fn effectors(&self) -> Vec<&[F]>;
-    fn flat_effectors(&self) -> Vec<F>;
+    fn effectors(&self) -> Vec<Vec<F>>;
+    fn effector_col(&self) -> Vec<F>;
 }
 
 impl<'a, 'b, NodeType, LoadType, TreeType, IdType, FloatType> Forward<FloatType>
@@ -183,30 +186,32 @@ where
     NodeType: NodeLike<LoadType, IdType>,
     TreeType: DepthFirstIterable<LoadType, IdType, Node = NodeType>,
     IdType: Eq + Clone + Hash + Debug,
+    FloatType: Zero + Clone,
 {
-    fn effectors(&self) -> Vec<&[LoadType::FloatType]> {
-        //     // &mut col[*offset..*offset + effector_node.get().effector_size()],
-
-        //     izip!(&self.selected_effectors, &self.offsets, &self.sizes)
-        //         .filter_map(|(&s, &i, &n)| if s { Some(&self.configuration[i..i + n]) } else { None })
-        //         .collect_vec()
-        todo!()
+    fn effectors(&self) -> Vec<Vec<LoadType::FloatType>> {
+        let effector_col = self.effector_col();
+        izip!(
+            &self.config.selected_effectors,
+            &self.config.offsets,
+            &self.config.sizes
+        )
+        .filter_map(|(&s, &i, &n)| if s { Some(effector_col[i..i + n].to_vec()) } else { None })
+        .collect_vec()
     }
-    fn flat_effectors(&self) -> Vec<LoadType::FloatType> {
-        // let mut effectors = vec![LoadType::FloatType::zero(); self.rows()];
+    fn effector_col(&self) -> Vec<LoadType::FloatType> {
+        let mut effectors = vec![LoadType::FloatType::zero(); self.config.rows];
 
-        // izip!(
-        //     &self.tree,
-        //     &self.transformations,
-        //     &self.selected_effectors,
-        //     &self.offsets
-        // )
-        // .filter_map(|(node, pose, selected, offset)| if *selected { Some((node, pose, offset)) } else { None })
-        // .for_each(|(node, pose, offset)| {
-        //     node.get().effector(pose, &mut effectors, *offset);
-        // });
-        // effectors
-        todo!()
+        izip!(
+            self.tree.iter(),
+            &self.transformations,
+            &self.config.selected_effectors,
+            &self.config.offsets
+        )
+        .filter_map(|(node, pose, selected, offset)| if *selected { Some((node, pose, offset)) } else { None })
+        .for_each(|(node, pose, offset)| {
+            node.get().effector(pose, &mut effectors, *offset);
+        });
+        effectors
     }
 }
 
@@ -341,13 +346,12 @@ mod tests {
 
         let tree: DepthFirstArenaTree<_, _> = tree.into();
 
-        let selected_effectors = { todo!() };
+        let selected_effectors = vec![&ref2, &ref3, &ref4];
         let config = tree.config(vec![&ref2, &ref3, &ref4], selected_effectors, 32);
 
         let pose = tree.pose(&[0.0, 0.0, std::f64::consts::FRAC_PI_2, 0.0], &config);
 
         let res = pose.effectors();
-        let res = res.iter().map(|&el| el.to_owned()).collect_vec();
 
         assert_eq!(
             res,
