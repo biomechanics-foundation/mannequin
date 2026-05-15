@@ -19,8 +19,8 @@
 //! * Traits – adjectives that indicate capability and behavior (TODO this is currently not always true)
 //! * Structs – substantives that indicate entities implementing a behavior
 //! * Methods – imperative forms with the exception of getters and factories, which
-//!             are uses substantives (i.e., omit a `get_` prefix) much like the standard library.
-//!             Callback methods have a `on_` prefix
+//!   are uses substantives (i.e., omit a `get_` prefix) much like the standard library.
+//!   Callback methods have a `on_` prefix
 
 pub mod arena;
 pub mod differentiable;

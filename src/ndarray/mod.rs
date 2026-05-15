@@ -1,7 +1,7 @@
 //! Module for the implementations using the ndarray backend. Coontains the basic calculus required
 use crate::MannequinError;
 use ndarray::{prelude::*, ErrorKind::IncompatibleShape, ShapeError};
-use ndarray_linalg::{Inverse, LeastSquaresSvd, Solve, QR};
+use ndarray_linalg::Inverse;
 
 pub mod robot;
 
@@ -9,7 +9,7 @@ pub mod robot;
 pub fn rotate_x_4x4(param: f64) -> Array2<f64> {
     array![
         [1.0, 0.0, 0.0, 0.0],
-        [0.0, param.cos(), -1.0 * param.sin(), 0.0],
+        [0.0, param.cos(), -param.sin(), 0.0],
         [0.0, param.sin(), param.cos(), 0.0],
         [0.0, 0.0, 0.0, 1.0]
     ]
@@ -20,7 +20,7 @@ pub fn rotate_y_4x4(param: f64) -> Array2<f64> {
     array![
         [param.cos(), 0.0, param.sin(), 0.0],
         [0.0, 1.0, 0.0, 0.0],
-        [(-1.0) * param.sin(), 0.0, param.cos(), 0.0],
+        [-param.sin(), 0.0, param.cos(), 0.0],
         [0.0, 0.0, 0.0, 1.0]
     ]
 }
@@ -28,7 +28,7 @@ pub fn rotate_y_4x4(param: f64) -> Array2<f64> {
 /// Creates a homogeneous, 4x4 rotation matrix around the z axis.
 pub fn rotate_z_4x4(param: f64) -> Array2<f64> {
     array![
-        [param.cos(), -1.0 * param.sin(), 0.0, 0.0],
+        [param.cos(), -param.sin(), 0.0, 0.0],
         [param.sin(), param.cos(), 0.0, 0.0],
         [0.0, 0.0, 1.0, 0.0],
         [0.0, 0.0, 0.0, 1.0]

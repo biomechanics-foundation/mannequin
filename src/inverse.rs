@@ -1,4 +1,4 @@
-//! Interface and basic implementor for the inverse kinematic model.
+//! Interface and basic implementer for the inverse kinematic model.
 
 use std::{fmt::Debug, hash::Hash, iter::Sum};
 
@@ -177,163 +177,12 @@ where
     }
 }
 
-/* /// Trait representing a stateful inverse kinematics algorithm.
-///
-/// It allows selecting the effectors to be computed and thus a specific (or multiple) kinematic chain(s), and
-/// which joints are active (can be moved).
-pub trait Inverse<TreeType, LoadType>
-where
-    TreeType: DepthFirstIterable<LoadType, LoadType::NodeId>,
-    LoadType: Rigid,
-{
-    /// The return type com [Inverse::solve] that carries information about the outcome
-    type Info;
-
-    /// Preparation the computation (memory allocation, and joint/effector selection).
-    fn setup(
-        &mut self,
-        tree: &TreeType,
-        selected_joints: &[&<LoadType as Rigid>::NodeId],
-        selected_effectors: &[&LoadType::NodeId],
-    );
-
-    /// Compute the inverse kinematics
-    fn solve(
-        &mut self,
-        tree: &TreeType,
-        param: &mut [<LoadType as Rigid>::FloatType],
-        targets: &[<LoadType as Rigid>::FloatType],
-    ) -> Self::Info;
-}
-
-/// Information about the solution for the default, differential IK solver
-#[derive(Debug, Clone)]
-pub struct DiffIKInfo<F: Float> {
-    /// Number of required iterations (indicates convergence)
-    pub iteration_count: usize,
-    /// The final squared error
-    pub squared_error: F,
-}
-
-/// Reference implementation of a differential IK solver that is agnostic of the backend.
-///
-/// It delegates linear algebra operations (solving the system of linear equations) to
-/// backend-specific implementers of [crate::Rigid], and uses a backend-agnostic
-/// [Differentiable] for computing the Jacobian matrix.
-pub struct DifferentialInverseModel<FloatType, TreeType>
-where
-    FloatType: Float,
-    TreeType: Differentiable<FloatType>,
-{
-    _max_depth: usize,
-    max_iterations_count: usize,
-    min_error: FloatType,
-    differential_model: TreeType,
-    scale_difference: FloatType,
-}
-
-impl<FloatType, DifferentiableType> DifferentialInverseModel<FloatType, DifferentiableType>
-where
-    FloatType: Float,
-    DifferentiableType: Differentiable<FloatType>,
-{
-    pub fn new(
-        _max_depth: usize,
-        max_iterations_count: usize,
-        min_error: FloatType,
-        differential_model: DifferentiableType,
-        scale_difference: FloatType,
-    ) -> Self {
-        Self {
-            _max_depth,
-            max_iterations_count,
-            min_error,
-            differential_model,
-            scale_difference,
-        }
-    }
-}
-
-impl<RB, IT, F, D> Inverse<IT, RB> for DifferentialInverseModel<F, D>
-where
-    IT: DepthFirstIterable<RB, RB::NodeId>,
-    RB: Rigid<FloatType = F>,
-    F: Float + Sum + Debug,
-    D: Differentiable<F>,
-{
-    type Info = DiffIKInfo<F>;
-
-    fn setup(
-        &mut self,
-        tree: &IT,
-        selected_joints: &[&<RB as Rigid>::NodeId],
-        selected_effectors: &[&<RB as Rigid>::NodeId],
-    ) {
-        self.differential_model.setup(tree, selected_joints, selected_effectors);
-    }
-
-    // TODO Think about turning this into an iterator ...
-    fn solve(&mut self, tree: &IT, params: &mut [F], targets: &[F]) -> Self::Info {
-        let mut counter = 0;
-        let mut error: F;
-        let mut result = vec![F::zero(); self.differential_model.active().iter().filter(|i| **i).count()];
-        loop {
-            dbg!(counter);
-            self.differential_model.compute(tree, params, ComputeSelection::All);
-            // dbg!(&params);
-            dbg!(self.differential_model.flat_effectors());
-            // dbg!(self.differential_model.effectors());
-            let mut diff = izip!(targets, self.differential_model.flat_effectors())
-                .map(|(x, y)| (*x - *y))
-                .collect_vec();
-
-            // dbg!(&self.differential_model.jacobian());
-            error = diff.iter().map(|x| *x * *x).sum();
-            dbg!(&error);
-            // dbg!(&diff);
-
-            diff.iter_mut().for_each(|x| *x = *x * self.scale_difference);
-
-            RB::solve_linear(
-                self.differential_model.jacobian(),
-                self.differential_model.rows(),
-                self.differential_model.cols(),
-                &diff,
-                &mut result,
-            );
-
-            // dbg!(&result);
-            // dbg!(&params);
-
-            params
-                .iter_mut()
-                .filter_active(self.differential_model.active())
-                .zip(&result)
-                .for_each(|(p, r)| *p = *p + *r);
-
-            if error < self.min_error {
-                break;
-            }
-            counter += 1;
-            if counter >= self.max_iterations_count {
-                break;
-            }
-        }
-
-        Self::Info {
-            iteration_count: counter,
-            squared_error: error,
-        }
-    }
-} */
-
 #[cfg(feature = "ndarray")]
 #[cfg(test)]
 mod test {
     // The `ndarray` as a reference implementation is used for testing
 
     use super::*;
-    use crate::arena::iterables::OptimizedDirectionIterable;
     use crate::ndarray::robot::{Axis, LinkNodeId, Segment};
     use crate::{DepthFirstArenaTree, DirectedArenaTree, DirectionIterable};
     use ndarray::prelude::*;
@@ -434,8 +283,7 @@ mod test {
         let n_iterations = 13;
         let fk_config = tree.config(vec![], vec![&"link_9".to_string()], 32);
         dbg!(&fk_config);
-        let param = vec![0.0, 0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::FRAC_PI_2, 0.0];
-        let mut param = vec![0.0; 10];
+        let param = vec![0.0; 10];
         let ik_config = InverseConfig::new(param, 42, 0.001, 0.01);
         let ik = tree.inverse(&fk_config, &ik_config);
         // let mut ik = DifferentialInverseModel::new(42, n_iterations, 0.01, DifferentiableModel::new(), 0.001);
@@ -449,6 +297,7 @@ mod test {
 
         let result = ik.solve(&effectors);
 
+        // FIXME: need to do more checks
         // assert_eq!(result.iteration_count, n_iterations);
         // dbg!(param);
         // dbg!(result);

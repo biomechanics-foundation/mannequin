@@ -6,8 +6,8 @@
 
 use num_traits::Float;
 
-use crate::{Articulated, DepthFirstArenaTree, DepthFirstIterable, Inverse};
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use crate::DepthFirstArenaTree;
+use std::{fmt::Debug, hash::Hash};
 
 /// A Rigid Body represents a single, rigid link connected to other links via a joint.
 /// Synonyms: Bone
@@ -48,7 +48,7 @@ pub trait Rigid: PartialEq {
     /// target_buffer: Memory location to where the results are written to. The implementation is responsible of taking care only that
     /// correct location in the buffer is written to (e.g.,
     /// `[offset..offset + self.effector_size()]`)
-    /// offset: Start positin in the buffer to write to
+    /// offset: Start position in the buffer to write to
     fn partial_derivative(
         &self,
         pose: &Self::Transformation,
@@ -64,12 +64,12 @@ pub trait Rigid: PartialEq {
     fn effector_count(&self) -> usize;
 
     /// The number of rows / elements the effector take in the jacobian matrix (usually dim * count).
-    /// However, by manually granting control, one can have effocters with different dimensionality
+    /// However, by manually granting control, one can have effectors with different dimensionality
     fn effector_size(&self) -> usize {
         self.dim() * self.effector_count()
     }
 
-    /// Returns the eutral element wrt. the transoformation convention used
+    /// Returns the neutral element wrt. the transformation convention used
     fn neutral_element() -> Self::Transformation;
 
     // Invert a transformation
